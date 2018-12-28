@@ -3,7 +3,6 @@
 
 const getOpts = require("get-options");
 const {join}  = require("path");
-const {spawn} = require("child_process");
 const {readdirSync} = require("fs");
 let {options, argv} = getOpts(process.argv.slice(2), {
 	"-v, --version": "",
@@ -24,13 +23,6 @@ if(options.help){
 	process.exit(0);
 }
 
-// Make sure native modules are supported before attempting to execute
-const [major, minor] = process.version.replace(/^v/, "").split(".").map(Number);
-if(major < 8 || (8 === major && minor < 5)){
-	process.stderr.write("fatal: Node.js v8.5.0 or later is required to run.\n");
-	process.exit(1);
-}
-
 // Not enough arguments
 if(!argv.length){
 	process.stdout.write("fatal: no subcommand specified.\n");
@@ -47,16 +39,8 @@ if(!readdirSync(path).includes(subcmd)){
 }
 
 path = join(path, subcmd);
-argv = ["--", path, ...argv];
-needsESMFlag() && argv.unshift("--experimental-modules");
-spawn(process.execPath, argv, {windowsHide: true, stdio: "inherit"});
-
-
-
-function needsESMFlag(){
-	const flags = process.allowedNodeEnvironmentFlags;
-	return "object" !== typeof flags || flags.has("--experimental-modules");
-}
+process.argv = [process.execPath, path, ...argv];
+require(path);
 
 
 function showUsage(){

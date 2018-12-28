@@ -1,6 +1,16 @@
 #!/usr/bin/env node
 "use strict";
 
-async function findFiles(pattern, inDirectory = process.cwd()){
-	const fs = require("fs");
+const {readdir, lstat} = require("fs");
+const {join} = require("path");
+
+async function ls(path){
+	const files = (await new Promise((resolve, reject) => {
+		readdir(path, (error, list) => error
+			? reject(error)
+			: resolve(list));
+	})).map(name => join(path, name));
+	console.log(files);
 }
+
+ls(__dirname);
