@@ -1,0 +1,61 @@
+#!/usr/bin/env node
+"use strict";
+
+module.exports = which;
+
+// Allow direct execution for consistency with other tools
+if(require.main === module || global.$0 === __filename){
+	const getOpts = require("get-options");
+	const {options, argv} = getOpts(process.argv.slice(2), {
+		"-a, --all": "",
+		"-s, --silent": "",
+	});
+	if(!argv.length){
+		process.stderr.write("usage: which [-as] [...programs]\n");
+		process.exit(1);
+	}
+	Promise.all(argv.map(arg => {
+		return which(arg, options.all).then(paths => {
+			if(!paths.length) return null;
+			if(!options.silent)
+				for(const path of options.all ? paths : [paths])
+					process.stdout.write(`${path}\n`);
+			return paths;
+		});
+	})).then(matched => {
+		const foundAll = matched.filter(Boolean).length === argv.length;
+		process.exit(foundAll ? 0 : 1);
+	});
+}
+
+
+/**
+ * Locate a program file in the user's $PATH.
+ *
+ * Resolves with an empty string/array if nothing was found.
+ *
+ * @example which("curl") == "/usr/bin/curl"
+ * @example which("nada") == ""
+ * @param {String} name
+ * @param {Boolean} [all=false]
+ * @return {Promise}
+ */
+async function which(name, all = false){
+	if(!name) return all ? [] : "";
+	const cmdStr = "win32" === process.platform
+		? `@for %g in (ECHO ${name.replace(/%/g, "%%")}) do`
+			+ " @for %e in (%PATHEXT%) do"
+			+ " @for %i in (%g%e) do "
+			+ ' @if NOT "%~$PATH:i"=="" echo %~$PATH:i'
+		: all
+			? "IFS=:; for i in $PATH; do"
+				+ ` p="$i/"'${name.replace(/'/g, `'"'"'`)}';`
+				+ ' if [ -x "$p" ] && [ -f "$p" ]; then printf "%s\\n" "$p"; fi;'
+				+ " done"
+			: `command -v '${name.replace(/'/g, `'"'"'`)}' 2>/dev/null || true`;
+	const result = await new Promise((resolve, reject) =>
+		require("child_process").exec(cmdStr, {windowsHide: true}, (error, output) => error
+			? reject(error)
+			: resolve(output.split(/\r?\n/).filter(Boolean))));
+	return all ? result : result[0] || "";
+}

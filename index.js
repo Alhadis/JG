@@ -40,6 +40,7 @@ if(!readdirSync(path).includes(subcmd)){
 
 path = join(path, subcmd);
 process.argv = [process.execPath, path, ...argv];
+global.$0 = path;
 require(path);
 
 
