@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+"use strict";
+
+async function findFiles(pattern, inDirectory = process.cwd()){
+	const fs = require("fs");
+}
