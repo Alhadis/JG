@@ -14,15 +14,13 @@ if(require.main === module || global.$0 === __filename){
 		process.stderr.write("usage: which [-as] [...programs]\n");
 		process.exit(1);
 	}
-	Promise.all(argv.map(arg => {
-		return which(arg, options.all).then(paths => {
-			if(!paths.length) return null;
-			if(!options.silent)
-				for(const path of options.all ? paths : [paths])
-					process.stdout.write(`${path}\n`);
-			return paths;
-		});
-	})).then(matched => {
+	Promise.all(argv.map(arg => which(arg, options.all).then(paths => {
+		if(!paths.length) return null;
+		if(!options.silent)
+			for(const path of options.all ? paths : [paths])
+				process.stdout.write(`${path}\n`);
+		return paths;
+	}))).then(matched => {
 		const foundAll = matched.filter(Boolean).length === argv.length;
 		process.exit(foundAll ? 0 : 1);
 	});

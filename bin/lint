@@ -2,21 +2,36 @@
 "use strict";
 
 const fs = require("fs");
-const {join} = require("path");
+const {join, resolve} = require("path");
+const {spawn} = require("child_process");
 const which = require("./which");
 
 
 (async () => {
-	const files = await findFiles(process.argv[2] || process.cwd());
+	const paths = process.argv.slice(2);
+	if(!paths.length)
+		paths.push(".");
+	lint(...paths);
+})();
+
+
+async function lint(...paths){
+	paths = paths.filter(Boolean);
 	
+	const files = new Map();
+	const maps = await Promise.all(paths.map(path => findFiles(resolve(path))));
+	for(const map of maps)
+		for(const [key, value] of map)
+			files.set(key, value);
+
 	// Stuff we can lint with different NPM linters
 	const js = [];
 	const ts = [];
 	const coffee = [];
-	
+
 	for(const [path, stats] of files){
 		if(!stats.isFile()) continue;
-		if(/\.jsx?$/i.test(path))                 js.push(path);
+		if(/\.(?:mjs|jsx?)$/i.test(path))         js.push(path);
 		else if(/\.tsx?$/i.test(path))            ts.push(path);
 		else if(/\.(?:cson|coffee)$/i.test(path)) coffee.push(path);
 		
@@ -45,8 +60,8 @@ const which = require("./which");
 	
 	// Ensure all required dependencies are available
 	const missing = [];
-	if(js.length && !await which("eslint"))         missing.push("eslint");
-	if(ts.length && !await which("tslint"))         missing.push("tslint");
+	if(js.length     && !await which("eslint"))     missing.push("eslint");
+	if(ts.length     && !await which("tslint"))     missing.push("tslint");
 	if(coffee.length && !await which("coffeelint")) missing.push("coffeelint");
 	if(missing.length){
 		const names = missing.join(", ");
@@ -57,15 +72,55 @@ const which = require("./which");
 		process.exit(1);
 	}
 	
-	if(js.length){
-		const configPath = join(__dirname, "..", "eslint", ".eslintrc.json");
-		console.log(js, findBasePath(js));
-		0 && await exec(linters.eslint, ["--config", configPath, "--ext", "mjs,js", "--"], {
-		
-		});
-	}
-})();
+	let code = 0;
+	if(js.length)     (code = await lintJavaScript(...js))       && process.exit(code);
+	if(ts.length)     (code = await lintTypeScript(...ts))       && process.exit(code);
+	if(coffee.length) (code = await lintCoffeeScript(...coffee)) && process.exit(code);
+}
 
+
+async function run(cmd, args, verbose = false){
+	verbose && process.stderr.write(`${cmd} ${args.join(" ")}\n`);
+	const proc = spawn(cmd, args, {windowsHide: true, stdio: "inherit"});
+	const code = await new Promise((resolve, reject) => {
+		proc.on("close", code => resolve(code));
+		proc.on("error", error => reject(error));
+	});
+	return code;
+}
+
+async function lintJavaScript(...files){
+	return run("eslint", [
+		"--ext", "mjs,js",
+		"--", ...resolveFileList(files, /\.(?:mjs|jsx?)$/i),
+	]);
+}
+
+async function lintTypeScript(...files){
+	return run("tslint", [
+		"--config", join(__dirname, "..", "tslint", "tslint.json"),
+		"--", ...resolveFileList(files, /\.tsx?$/i),
+	]);
+}
+
+async function lintCoffeeScript(...files){
+	return run("coffeelint", [
+		"-f", join(__dirname, "..", "coffeelint", "coffeelint.json"),
+		...resolveFileList(files, /\.(?:cson|coffee)?$/i),
+	]);
+}
+
+
+function resolveFileList(paths, extMatch){
+	const noExt = [];
+	const hasExt = [];
+	for(const path of paths)
+		extMatch.test(path) ? hasExt.push(path) : noExt.push(path)
+	const list = [];
+	if(hasExt.length) list.push(findBasePath(hasExt));
+	if(noExt.length)  list.push(...noExt);
+	return Array.from(new Set(list));
+}
 
 
 async function findFiles(path, ignorePattern = /(?:^|[\\/])(?:\.git|node_modules)$/i){
