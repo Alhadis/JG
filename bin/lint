@@ -4,13 +4,54 @@
 const {readdir, lstat} = require("fs");
 const {join} = require("path");
 
+(async () => {
+	const files = await findFiles(process.argv[2] || process.cwd());
+	
+	// Stuff we can lint with different NPM linters
+	const js = [];
+	const ts = [];
+	const coffee = [];
+	
+	for(const [path, stats] of files){
+		if(!stats.isFile()) continue;
+		if(/\.jsx?$/i.test(path))                 js.push(path);
+		else if(/\.tsx?$/i.test(path))            ts.push(path);
+		else if(/\.(?:cson|coffee)$/i.test(path)) coffee.push(path);
+	}
+	
+	console.log({js, ts, coffee});
+})();
+
+
+
+async function findFiles(path, ignorePattern = /(?:^|[\\/])(?:\.git|node_modules)$/i){
+	path = path || process.cwd();
+	const files = await ls(path);
+	const searches = [];
+	for(const [path, stats] of files)
+		if(stats.isDirectory() && !ignorePattern.test(path))
+			searches.push(findFiles(path));
+	
+	await Promise.all(searches).then(results => {
+		for(const map of results)
+			for(const [path, stats] of map)
+				files.set(path, stats);
+	});
+	return files;
+}
+
 async function ls(path){
-	const files = (await new Promise((resolve, reject) => {
+	const files = await new Promise((resolve, reject) => {
 		readdir(path, (error, list) => error
 			? reject(error)
 			: resolve(list));
-	})).map(name => join(path, name));
-	console.log(files);
+	});
+	return new Map([...await Promise.all(
+		files.map(file => new Promise((resolve, reject) => {
+			file = join(path, file);
+			lstat(file, (error, stats) => error
+				? reject(error)
+				: resolve([file, stats]));
+		}))
+	)]);
 }
-
-ls(__dirname);
