@@ -8,6 +8,7 @@ const {readdirSync} = require("fs");
 const {options, argv} = getOpts(process.argv.slice(2), {
 	"-v, --version": "",
 	"-h, --help": "",
+	"-p, --print-path": "",
 	"-i, --in-place-edit": "[pattern=\\S+]",
 });
 
@@ -23,6 +24,11 @@ if(options.help){
 	showUsage();
 	process.exit(0);
 }
+
+// Switches which are aliases/shorthand of subcommands
+if(options.inPlaceEdit)    argv.unshift("edit", "-i");
+else if(options.printPath) argv.unshift("path");
+
 
 // Not enough arguments
 if(!argv.length){

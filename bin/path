@@ -1,0 +1,66 @@
+#!/usr/bin/env node
+"use strict";
+
+const {existsSync} = require("fs");
+const {join, resolve} = require("path");
+const ROOT_DIR = join(__dirname, "..");
+module.exports = getPath;
+
+// Allow use from command-line
+if(require.main === module || global.$0 === __filename){
+	const args = process.argv.slice(2);
+	args.length || args.push("");
+	let paths = args.map(arg => getPath(arg));
+	const status = paths.includes(null);
+	
+	// Emit result(s)
+	paths = paths.filter(Boolean);
+	if(paths.length){
+		process.stdout.write(paths.join("\n"));
+		if(process.stdout.isTTY)
+			process.stdout.write("\n");
+	}
+	process.exit(status);
+}
+
+
+/**
+ * Resolve the absolute path of a file within `jg`'s installation path.
+ *
+ * Shorthands are supported for various linter configs, to
+ * facilitate brevity in build-scripts or makefiles.
+ *
+ * @example getPath("eslint") == "/path/to/jg/eslint/.eslintrc.json";
+ * @param {String} filename
+ * @return {String|null} An absolute path if the file exists; otherwise, null.
+ * @public
+ */
+function getPath(filename){
+	
+	// Shorthand: ESLint
+	let match = filename.match(/^\.?eslint(?:rc|[-/]?config)?(\/atom\/?)?(?:\.json)?$/i);
+	if(null !== match){
+		const file = match[1] ? "atom.js" : ".eslintrc.json";
+		return resolve(join(ROOT_DIR, "eslint", file));
+	}
+	
+	// Shorthand: TSLint
+	match = filename.match(/^\.?tslint(?:rc|[-/]?config)?(?:\.json)?$/i);
+	if(null !== match)
+		return resolve(join(ROOT_DIR, "tslint", "tslint.json"));
+
+	// Shorthand: CoffeeLint
+	match = filename.match(/^\.?coffeelint(?:rc|[-/]?config)?(?:\.json)?$/i);
+	if(null !== match)
+		return resolve(join(ROOT_DIR, "coffeelint", "coffeelint.json"));
+	
+	const result = filename
+		? resolve(join(ROOT_DIR, filename))
+		: resolve(ROOT_DIR);
+	
+	if(existsSync(result))
+		return result;
+	
+	process.stderr.write(`No such file: ${filename}\n`);
+	return null;
+}
