@@ -19,15 +19,31 @@ module.exports = {
 	resolveFileList,
 };
 
+// Run linters if loading file directly
 if(require.main === module || global.$0 === __filename){
-	const paths = process.argv.slice(2);
-	paths.length || paths.push(".");
-	lint(...paths);
+	const getOpts = require("get-options");
+	const {options, argv} = getOpts(process.argv.slice(2), {
+		"-j, --js": "",
+		"-t, --ts": "",
+		"-c, --coffee": "",
+		"-q, --no-echo": "",
+	});
+	argv.length || argv.push(".");
+	lint(argv, options);
 }
 
 
-async function lint(...paths){
+async function lint(paths, options = {}){
+	options = {...options}; // Avoid modifying by reference
 	paths = paths.filter(Boolean);
+	
+	// Enable everything if a specific language/linter wasn't given
+	if(!(options.js || options.ts || options.coffee))
+		Object.assign(options, {js: true, ts: true, coffee: true});
+	Object.defineProperty(options, "cs", {value: options.coffee});
+	
+	if(+process.env.DEBUG)
+		console.log("Linting with options", options);
 	
 	const files = new Map();
 	const maps = await Promise.all(paths.map(path => findFiles(resolve(path))));
@@ -42,9 +58,9 @@ async function lint(...paths){
 
 	for(const [path, stats] of files){
 		if(!stats.isFile()) continue;
-		else if(JS_EXT.test(path)) js.push(path);
-		else if(TS_EXT.test(path)) ts.push(path);
-		else if(CS_EXT.test(path)) coffee.push(path);
+		else if(JS_EXT.test(path)) options.js && js.push(path);
+		else if(TS_EXT.test(path)) options.ts && ts.push(path);
+		else if(CS_EXT.test(path)) options.cs && coffee.push(path);
 		
 		// Identify executables without file extensions
 		else if(0o111 & stats.mode){
@@ -61,9 +77,9 @@ async function lint(...paths){
 					? (match[2] || "").split("/").pop()
 					:  match[1];
 				switch(interpreter){
-					case "node":   js.push(path);     break;
-					case "tsc":    ts.push(path);     break;
-					case "coffee": coffee.push(path); break;
+					case "node":   options.js && js.push(path);     break;
+					case "tsc":    options.ts && ts.push(path);     break;
+					case "coffee": options.cs && coffee.push(path); break;
 				}
 			}
 		}
@@ -84,23 +100,26 @@ async function lint(...paths){
 	}
 	
 	let code = 0;
-	if(js.length)     (code = await lintJavaScript(...js))       && process.exit(code);
-	if(ts.length)     (code = await lintTypeScript(...ts))       && process.exit(code);
-	if(coffee.length) (code = await lintCoffeeScript(...coffee)) && process.exit(code);
+	if(js.length)     (code = await lintJavaScript(js, options))       && process.exit(code);
+	if(ts.length)     (code = await lintTypeScript(ts, options))       && process.exit(code);
+	if(coffee.length) (code = await lintCoffeeScript(coffee, options)) && process.exit(code);
 }
 
 
 /**
  * Execute a command by name.
  *
- * @param {String} cmd - Executable's name
+ * @param {String}   cmd - Executable's name
  * @param {String[]} args - Arguments list
- * @param {String} [stdio="inherit"] - I/O specifier
+ * @param {Object}  [options] - Hash containing additional options
+ * @param {Boolean} [options.echo=false] - Echo command to stderr
+ * @param {String}  [options.stdio="inherit"] - I/O specifier
  * @return {Number} Resolves with the command's exit code.
  * @internal
  */
-async function run(cmd, args, stdio = "inherit"){
-	+process.env.DEBUG && process.stderr.write(`${cmd} ${args.join(" ")}\n`);
+async function run(cmd, args, options = {}){
+	const {stdio = "inherit"} = options;
+	options.noEcho || process.stderr.write(`${cmd} ${args.join(" ")}\n`);
 	const proc = spawn(cmd, args, {windowsHide: true, stdio});
 	const code = await new Promise((resolve, reject) => {
 		proc.on("close", code => resolve(code));
@@ -114,20 +133,21 @@ async function run(cmd, args, stdio = "inherit"){
  * Run `eslint` on the specified file paths.
  *
  * @param {String[]} files - Resolved pathnames
+ * @param {Object} options - Options hash
  * @return {Number} Exit code returned by ESLint
  * @internal
  */
-async function lintJavaScript(...files){
+async function lintJavaScript(files, options){
 	const args = ["--ext", "mjs,js", "--", ...resolveFileList(files, /\.(?:mjs|jsx?)$/i)];
 	
 	// Test whether ESLint can find a config file
-	const code = await run("eslint", ["--print-config", "."], "ignore");
+	const code = await run("eslint", ["--print-config", "."], {...options, stdio: "ignore"});
 	if(2 === code){
 		const configFile = join(__dirname, "..", "eslint", ".eslintrc.json");
 		+process.env.DEBUG && console.log(`Can't find config. Using ${configFile}`);
 		args.unshift("--config", configFile);
 	}
-	return run("eslint", args);
+	return run("eslint", args, options);
 }
 
 
@@ -136,12 +156,14 @@ async function lintJavaScript(...files){
  *
  * @example lintTypeScript("/foo/bar", "/foo/baz") => `tslint --project /foo`;
  * @param {String[]} files - Resolved pathnames
+ * @param {Object} options - Options hash
  * @return {Number} Exit code reported by TSLint
  * @internal
  */
-async function lintTypeScript(...files){
+async function lintTypeScript(files, options){
 	const configFile = join(__dirname, "..", "tslint", "tslint.json");
-	return run("tslint", ["-c", configFile, ...files]);
+	const args = ["-c", configFile, ...files];
+	return run("tslint", args, options);
 }
 
 
@@ -153,12 +175,14 @@ async function lintTypeScript(...files){
  * list of specific file paths instead.
  *
  * @param {String[]} files - Resolved pathnames
+ * @param {Object} options - Options hash
  * @return {Number} Exit code reported by CoffeeLint
  * @internal
  */
-async function lintCoffeeScript(...files){
+async function lintCoffeeScript(files, options){
 	const configFile = join(__dirname, "..", "coffeelint", "coffeelint.json");
-	return run("coffeelint", ["-q", "--ext", "cson", "-f", configFile, ...files]);
+	const args = ["-q", "--ext", "cson", "-f", configFile, ...files];
+	return run("coffeelint", args, options);
 }
 
 
