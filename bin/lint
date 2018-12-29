@@ -4,15 +4,26 @@
 const fs = require("fs");
 const {join, resolve} = require("path");
 const {spawn} = require("child_process");
-const which = require("./which");
+const {findBasePath, which} = require("alhadis.utils");
 
+const JS_EXT = /\.(?:mjs|jsx?)$/i;
+const TS_EXT = /\.tsx?$/i;
+const CS_EXT = /\.(?:cson|coffee)$/i;
 
-(async () => {
+module.exports = {
+	lint,
+	run,
+	lintJavaScript,
+	lintTypeScript,
+	lintCoffeeScript,
+	resolveFileList,
+};
+
+if(require.main === module || global.$0 === __filename){
 	const paths = process.argv.slice(2);
-	if(!paths.length)
-		paths.push(".");
+	paths.length || paths.push(".");
 	lint(...paths);
-})();
+}
 
 
 async function lint(...paths){
@@ -31,9 +42,9 @@ async function lint(...paths){
 
 	for(const [path, stats] of files){
 		if(!stats.isFile()) continue;
-		if(/\.(?:mjs|jsx?)$/i.test(path))         js.push(path);
-		else if(/\.tsx?$/i.test(path))            ts.push(path);
-		else if(/\.(?:cson|coffee)$/i.test(path)) coffee.push(path);
+		else if(JS_EXT.test(path)) js.push(path);
+		else if(TS_EXT.test(path)) ts.push(path);
+		else if(CS_EXT.test(path)) coffee.push(path);
 		
 		// Identify executables without file extensions
 		else if(0o111 & stats.mode){
@@ -67,7 +78,7 @@ async function lint(...paths){
 		const names = missing.join(", ");
 		process.stderr.write([
 			`lint: Required linters not found in $PATH: ${names}`,
-			`Run \`npm install --global ${names}\`, then try again\n`
+			`Run \`npm install --global ${names}\`, then try again\n`,
 		].join("\n\n"));
 		process.exit(1);
 	}
@@ -79,9 +90,18 @@ async function lint(...paths){
 }
 
 
-async function run(cmd, args, verbose = false){
-	verbose && process.stderr.write(`${cmd} ${args.join(" ")}\n`);
-	const proc = spawn(cmd, args, {windowsHide: true, stdio: "inherit"});
+/**
+ * Execute a command by name.
+ *
+ * @param {String} cmd - Executable's name
+ * @param {String[]} args - Arguments list
+ * @param {String} [stdio="inherit"] - I/O specifier
+ * @return {Number} Resolves with the command's exit code.
+ * @internal
+ */
+async function run(cmd, args, stdio = "inherit"){
+	+process.env.DEBUG && process.stderr.write(`${cmd} ${args.join(" ")}\n`);
+	const proc = spawn(cmd, args, {windowsHide: true, stdio});
 	const code = await new Promise((resolve, reject) => {
 		proc.on("close", code => resolve(code));
 		proc.on("error", error => reject(error));
@@ -89,37 +109,86 @@ async function run(cmd, args, verbose = false){
 	return code;
 }
 
+
+/**
+ * Run `eslint` on the specified file paths.
+ *
+ * @param {String[]} files - Resolved pathnames
+ * @return {Number} Exit code returned by ESLint
+ * @internal
+ */
 async function lintJavaScript(...files){
-	return run("eslint", [
-		"--ext", "mjs,js",
-		"--", ...resolveFileList(files, /\.(?:mjs|jsx?)$/i),
-	]);
+	const args = ["--ext", "mjs,js", "--", ...resolveFileList(files, /\.(?:mjs|jsx?)$/i)];
+	
+	// Test whether ESLint can find a config file
+	const code = await run("eslint", ["--print-config", "."], "ignore");
+	if(2 === code){
+		const configFile = join(__dirname, "..", "eslint", ".eslintrc.json");
+		+process.env.DEBUG && console.log(`Can't find config. Using ${configFile}`);
+		args.unshift("--config", configFile);
+	}
+	return run("eslint", args);
 }
 
+
+/**
+ * Run `tslint` on the root directory enclosing each specified pathname.
+ *
+ * @example lintTypeScript("/foo/bar", "/foo/baz") => `tslint --project /foo`;
+ * @param {String[]} files - Resolved pathnames
+ * @return {Number} Exit code reported by TSLint
+ * @internal
+ */
 async function lintTypeScript(...files){
-	return run("tslint", [
-		"--config", join(__dirname, "..", "tslint", "tslint.json"),
-		"--", ...resolveFileList(files, /\.tsx?$/i),
-	]);
+	const configFile = join(__dirname, "..", "tslint", "tslint.json");
+	return run("tslint", ["-c", configFile, ...files]);
 }
 
+
+/**
+ * Run `coffeelint` on the specified file paths.
+ *
+ * NOTE: Avoid passing directories which contain `node_modules`
+ * folders; CoffeeLint won't ignore them by default. Provide a
+ * list of specific file paths instead.
+ *
+ * @param {String[]} files - Resolved pathnames
+ * @return {Number} Exit code reported by CoffeeLint
+ * @internal
+ */
 async function lintCoffeeScript(...files){
-	return run("coffeelint", [
-		"-f", join(__dirname, "..", "coffeelint", "coffeelint.json"),
-		...resolveFileList(files, /\.(?:cson|coffee)?$/i),
-	]);
+	const configFile = join(__dirname, "..", "coffeelint", "coffeelint.json");
+	return run("coffeelint", ["-q", "--ext", "cson", "-f", configFile, ...files]);
 }
 
 
+/**
+ * Reduce a list of files to a common root directory.
+ *
+ * Filenames which don't end in an extension matched by `extMatch`
+ * are included as-is; it's assumed these are executables without
+ * an extension that would be recognised by the respective linter.
+ *
+ * @param {String[]} paths
+ * @param {RegExp} extMatch
+ * @internal
+ */
 function resolveFileList(paths, extMatch){
 	const noExt = [];
 	const hasExt = [];
 	for(const path of paths)
-		extMatch.test(path) ? hasExt.push(path) : noExt.push(path)
-	const list = [];
+		extMatch.test(path) ? hasExt.push(path) : noExt.push(path);
+	
+	let list = [];
 	if(hasExt.length) list.push(findBasePath(hasExt));
 	if(noExt.length)  list.push(...noExt);
-	return Array.from(new Set(list));
+	const cwd = process.cwd().replace(/([/\\^$*+?{}[\]().|])/g, "\\$1");
+	const cwdExpr = new RegExp(`^${cwd}/?`, "i");
+	
+	// Optimise
+	list = list.map(path => path.replace(cwdExpr, "") || ".");
+	list = Array.from(new Set(list));
+	return list;
 }
 
 
@@ -153,36 +222,4 @@ async function ls(path){
 				: resolve([file, stats]));
 		}))
 	)]);
-}
-
-
-/**
- * Locate the root directory shared by multiple paths.
- *
- * @param {String[]} paths - A list of filesystem paths
- * @return {String} root
- */
-function findBasePath(paths){
-	const POSIX = -1 !== paths[0].indexOf("/");
-	let matched = [];
-	
-	// Spare ourselves the trouble if there's only one path.
-	if(1 === paths.length){
-		matched = (paths[0].replace(/[\\/]+$/, "")).split(/[\\/]/g);
-		matched.pop();
-	}
-	else{
-		const rows   = paths.map(d => d.split(/[\\/]/g));
-		const width  = Math.max(...rows.map(d => d.length));
-		const height = rows.length;
-		let x;
-		X: for(x = 0; x < width; ++x){
-			const str = rows[0][x];
-			for(let y = 1; y < height; ++y)
-				if(str !== rows[y][x]) break X;
-			matched.push(str);
-		}
-	}
-	
-	return matched.join(POSIX ? "/" : "\\");
 }

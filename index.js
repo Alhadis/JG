@@ -4,7 +4,8 @@
 const getOpts = require("get-options");
 const {join}  = require("path");
 const {readdirSync} = require("fs");
-let {options, argv} = getOpts(process.argv.slice(2), {
+
+const {options, argv} = getOpts(process.argv.slice(2), {
 	"-v, --version": "",
 	"-h, --help": "",
 	"-i, --in-place-edit": "[pattern=\\S+]",

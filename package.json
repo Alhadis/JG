@@ -4,6 +4,7 @@
 	"description": "Angry bastard's toolkit.",
 	"bin": {"jg": "index.js"},
 	"dependencies": {
-		"get-options": "^1.1.3"
+		"get-options": "^1.1.3",
+		"alhadis.utils": "latest"
 	}
 }

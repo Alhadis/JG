@@ -31,7 +31,7 @@ const server = HTTP.createServer(async (request, response) => {
 		return response.end();
 	}
 
-	const [type, isBinary = false] = getContentType(file);
+	const [type] = getContentType(file);
 	const date = new Date(stats.mtime);
 	response.writeHead(200, {
 		"Content-Type": type,
@@ -98,7 +98,7 @@ function getContentType(filePath){
  * @return {Object}
  */
 function parseURL(input){
-	let file = path.join(root, input.replace(/^\/+/, ""));
+	const file = path.join(root, input.replace(/^\/+/, ""));
 	if(!fs.existsSync(file)){
 		console.log("No such file: " + file);
 		return {};
