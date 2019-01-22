@@ -7,21 +7,93 @@
  */
 "use strict";
 
-const HTTP = require("http");
-const fs   = require("fs");
-const path = require("path");
+const HTTP    = require("http");
+const fs      = require("fs");
+const path    = require("path");
+const getOpts = require("get-options");
+const {
+	escapeHTML,
+	formatBytes,
+	timeSince,
+	deindent:HTML,
+} = require("alhadis.utils");
 
-const port = 1337;
-const root = path.resolve(process.argv[2] || process.cwd());
-process.chdir(root);
 
+// Resolve CLI switches
+const {options, argv} = getOpts(process.argv.slice(2), {
+	"-i, --index-dirs": "",
+	"-p, --port":       "[number=\\d+]",
+	"-P, --print-post": "",
+});
+const cwd       = process.cwd();
+const port      = Math.max(+options.port, 0) || 1337;
+let root        = argv[0] || cwd;
+const indexDirs = !!options.indexDirs;
+const printPost = !!options.printPost;
+
+
+// Allow standalone JS files to run in browsers
+let wrapperName  = "";
+let wrapperPath  = "";
+let wrapperIsESM = false;
+if(isFile(root) && /\.(m?)js$/i.test(root)){
+	wrapperIsESM = !!RegExp.lastParen;
+	wrapperName  = path.basename(root);
+	wrapperPath  = root;
+	root         = cwd;
+}
+
+// Otherwise, resolve root directory normally
+else if(isDirectory(root))
+	process.chdir(root);
+
+else{
+	console.error(`Not a directory: ${root}`);
+	process.exit(1);
+}
+
+
+// Initialise server
 const server = HTTP.createServer(async (request, response) => {
-	const {file, redirect, stats} = parseURL(request.url);
+	if(printPost && "POST" === request.method){
+		const data = await receive(request);
+		console.log(data);
+	}
+	
+	// Return an HTML wrapper for JS files loaded as root
+	if(wrapperPath && "/" === request.url.replace(/\?.*$/, "")){
+		const type = wrapperIsESM ? ' type="module"' : "";
+		const file = fs.readFileSync(wrapperPath, "utf8").replace(/^#![^\n]*/, "");
+		const html = HTML`
+			<!DOCTYPE html>
+			<html lang="en-AU">
+			<head>
+				<meta charset="utf-8" />
+				<title>${wrapperName}</title>
+				<style>*{tab-size: 4;}</style>
+			</head><body><script${type}>${file}</script></body></html>
+		`.trim().replace(/^\t+(?=<[/\w])/gm, "");
+		response.writeHead(200, {
+			"Content-Type": "text/html; charset=UTF-8",
+			"Last-Modified": new Date(fs.lstatSync(wrapperPath).mtime),
+		});
+		response.write(html);
+		return response.end();
+	}
+	
+	const {file, redirect, stats, html} = await getFileForURL(request.url);
+
+	// Arbitrary HTML
+	if(html){
+		response.writeHead(200, {"Content-Type": "text/html; charset=UTF-8"});
+		response.write(html);
+		return response.end();
+	}
 
 	// File not found
 	if(!file){
 		response.writeHead(404, {"Content-Type": "text/plain; charset=UTF-8"});
-		response.write("File not found");
+		response.write("File not found\n");
 		return response.end();
 	}
 
@@ -31,13 +103,11 @@ const server = HTTP.createServer(async (request, response) => {
 		return response.end();
 	}
 
-	const [type] = getContentType(file);
-	const date = new Date(stats.mtime);
 	response.writeHead(200, {
-		"Content-Type": type,
+		"Content-Type": getContentType(file),
 		"Cache-Control": "max-age=864000",
 		"Content-Length": stats.size,
-		"Last-Modified": date,
+		"Last-Modified": new Date(stats.mtime),
 	});
 	if("GET" === request.method)
 		await send(file, response);
@@ -47,58 +117,65 @@ const server = HTTP.createServer(async (request, response) => {
 
 server.listen(port);
 console.log(`Serving files from ${root} on port ${port}`);
+indexDirs && console.log("--index-dirs enabled: file-listings will be shown for directories without indexes");
+printPost && console.log("--print-post enabled: POST bodies will be echoed to stdout");
 
 
 /**
  * Derive a file's content-type from its file extension.
  *
  * @param {String} filePath
- * @return {Array}
+ * @return {String}
  */
 function getContentType(filePath){
-	const textual = {
-		css:  "text/css",
-		htm:  "text/html",
-		html: "text/html",
-		json: "application/json",
-		js:   "application/javascript",
-		mjs:  "application/javascript",
-		svg:  "image/svg+xml",
-		webmanifest: "application/manifest+json",
-	};
-	const binary = {
-		gif:   "image/gif",
-		jpg:   "image/jpeg",
-		jpeg:  "image/jpeg",
-		png:   "image/png",
+	const types = {
 		apng:  "image/png",
-		webp:  "image/webp",
-		svg:   "image/svg+xml",
-		ico:   "image/x-icon",
-		woff2: "font/woff2",
-		woff:  "font/woff",
-		ttf:   "font/ttf",
-		otf:   "font/otf",
+		css:   "text/css",
 		eot:   "application/vnd.ms-fontobject",
+		gif:   "image/gif",
+		htm:   "text/html",
+		html:  "text/html",
+		ico:   "image/x-icon",
+		jpeg:  "image/jpeg",
+		jpg:   "image/jpeg",
+		js:    "application/javascript",
+		json:  "application/json",
+		mjs:   "application/javascript",
+		otf:   "font/otf",
+		png:   "image/png",
+		svg:   "image/svg+xml",
+		ttf:   "font/ttf",
+		txt:   "text/plain",
+		webmanifest: "application/manifest+json",
+		webp:  "image/webp",
+		woff:  "font/woff",
+		woff2: "font/woff2",
 	};
-	if(/\.([-\w]+)$/.test(filePath)){
-		const extension = RegExp.lastParen.toLowerCase();
-		if(textual[extension]) return [textual[extension]];
-		if(binary[extension])  return [binary[extension], true];
-	}
-	return ["application/octet-stream", true];
+	const defaultType = "text/plain";
+	return /\.([-\w]+)$/.test(filePath)
+		? types[RegExp.lastParen.toLowerCase()] || defaultType
+		: defaultType;
 }
 
 
 /**
  * Map the URL of an HTTP request to a local filesystem path.
  *
- * @example parseURL("/dir/") == "/root/dir/index.html"
+ * @example <caption>List of all possible properties</caption>
+ * getFileForURL("/dir/") == {
+ *    file: "/root/dir/index.html",
+ *    redirect: "http://go.to/this.instead",
+ *    stats: fs.Stats {…},
+ * }
  * @param {String} input
  * @return {Object}
  */
-function parseURL(input){
-	const file = path.join(root, input.replace(/^\/+/, ""));
+async function getFileForURL(input){
+	input = input
+		.replace(/^\/+/, "")
+		.replace(/\?.+$/, "");
+	
+	const file = path.join(root, input);
 	if(!fs.existsSync(file)){
 		console.log("No such file: " + file);
 		return {};
@@ -108,13 +185,16 @@ function parseURL(input){
 	if(stats.isFile(file))
 		return {file, stats};
 
-	if(stats.isSymbolicLink(file))
-		return parseURL(fs.readlinkSync(file));
+	if(stats.isSymbolicLink(file)){
+		const parent = path.dirname(file);
+		const realPath = fs.readlinkSync(file);
+		return getFileForURL(path.resolve(parent, realPath));
+	}
 
 	if(stats.isDirectory(file)){
 		
 		// Enforce trailing slashes in URLs
-		if(!/\/$/.test(input))
+		if(!/\/$/.test(input) && input)
 			return {file, stats, redirect: input + "/"};
 		
 		for(let index of ["index.htm", "index.html"]){
@@ -122,6 +202,10 @@ function parseURL(input){
 			if(fs.existsSync(index))
 				return {file: index, stats: fs.lstatSync(index)};
 		}
+		
+		// Generate an HTML directory listing
+		if(indexDirs)
+			return {html: await makeIndex(file)};
 	}
 
 	return {};
@@ -136,9 +220,138 @@ function parseURL(input){
  * @return {Promise}
  */
 async function send(file, response){
-	await new Promise(resolve => {
+	return new Promise(resolve => {
 		const stream = fs.createReadStream(file);
 		stream.on("data", chunk => response.write(chunk));
 		stream.on("end", resolve);
 	});
+}
+
+
+/**
+ * Receive data submitted with an HTTP request.
+ *
+ * @param {IncomingMessage}
+ * @return {Promise}
+ */
+async function receive(request){
+	return new Promise(resolve => {
+		const chunks = [];
+		request.on("readable", () => {
+			const chunk = request.read();
+			null !== chunk
+				? chunks.push(chunk)
+				: resolve(Buffer.concat(chunks).toString("utf8"));
+		});
+	});
+}
+
+
+/**
+ * Return true if a path points to a filesystem directory.
+ *
+ * @example isDirectory("/tmp") === true;
+ * @param {String} path
+ * @param {Boolean} [followSymlinks=false]
+ * @return {Boolean}
+ */
+function isDirectory(path, followSymlinks = false){
+	return fs.existsSync(path) && (
+		followSymlinks ? fs.statSync : fs.lstatSync
+	)(path).isDirectory();
+}
+
+
+/**
+ * Return true if a path points to a "regular" file.
+ *
+ * @example isDirectory("/dev/null") === false;
+ * @param {String} path
+ * @param {Boolean} [followSymlinks=false]
+ * @return {Boolean}
+ */
+function isFile(path, followSymlinks = false){
+	return fs.existsSync(path) && (
+		followSymlinks ? fs.statSync : fs.lstatSync
+	)(path).isFile();
+}
+
+
+/**
+ * Generate an HTML listing of serve-able files in a directory.
+ *
+ * @param {String} dir
+ * @return {String}
+ */
+async function makeIndex(dir){
+	const files = fs.readdirSync(dir).map(name => {
+		const absdir = path.join(dir, name);
+		const stats = fs.lstatSync(absdir);
+		if(!stats.isFile() && !stats.isDirectory() && !stats.isSymbolicLink())
+			return null;
+		name = escapeHTML(name);
+		let type = "";
+		if(stats.isFile())              type = {icon: "📄", name: "File"};
+		else if(stats.isSymbolicLink()) type = {icon: "🔗", name: "Link"};
+		else if(stats.isDirectory())   {type = {icon: "📁", name: "Directory"}; name += "/"; }
+		return Object.assign(stats, {path: absdir, name, type});
+	}).filter(Boolean).sort((a, b) => {
+		if(a.isDirectory() && b.isFile()) return -1;
+		if(b.isFile() && a.isDirectory()) return  1;
+		if(a.name < b.name) return -1;
+		if(b.name > a.name) return  1;
+		return 0;
+	});
+	
+	// Prepend containing directory
+	files.unshift(Object.assign(fs.lstatSync(dir), {
+		path: dir,
+		name: "..",
+		type: {
+			icon: "📁",
+			name: "Directory",
+		},
+	}));
+	
+	const title = `Index of ${escapeHTML(dir)}`;
+	return HTML`
+		<!DOCTYPE html>
+		<html lang="en-AU">
+		<head>
+			<meta charset="utf-8" />
+			<title>${title}</title>
+			<style>
+				*    { box-sizing: border-box; tab-size: 4; }
+				html { font-family: Cambria, serif; }
+				a    { display: block; padding: .5em; }
+				th   { border-bottom: 1px solid #aaa; }
+				td:first-child { text-align: center; }
+				td:nth-child(2) ~ *{
+					padding-left:  .5em;
+					padding-right: .5em;
+				}
+			</style>
+		</head>
+		<body>
+			<h1>${title}</h1>
+			<table>
+				<thead>
+					<tr>
+						<th>Type</th>
+						<th>Name</th>
+						<th>Size</th>
+						<th>Date Modified</th>
+					</tr>
+				</thead>
+				<tbody>${files.map(file => HTML`
+					<tr>
+						<td title="${file.type.name}">${file.type.icon}</td>
+						<td><a href="${file.name}">${file.name}</a></td>
+						<td>${formatBytes(file.size)}</td>
+						<td>${timeSince(file.mtime)}</td>
+					</tr>
+				`).join("")}</tbody>
+			</table>
+		</body>
+		</html>`;
 }
