@@ -319,6 +319,7 @@ async function makeIndex(dir){
 		<html lang="en-AU">
 		<head>
 			<meta charset="utf-8" />
+			<meta name="viewport" content="initial-scale=1, minimum-scale=1" />
 			<title>${title}</title>
 			<style>
 				*    { box-sizing: border-box; tab-size: 4; }
@@ -329,11 +330,15 @@ async function makeIndex(dir){
 				td:nth-child(2) ~ *{
 					padding-left:  .5em;
 					padding-right: .5em;
+					white-space: nowrap;
+				}
+				@media (max-width: 25em){
+					h1{ font-size: 1.35em; }
 				}
 			</style>
 		</head>
 		<body>
-			<h1>${title}</h1>
+			<h1>${title.replace(/\//g, "/<wbr/>")}</h1>
 			<table>
 				<thead>
 					<tr>
