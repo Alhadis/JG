@@ -293,7 +293,7 @@ async function makeIndex(dir){
 		let type = "";
 		if(stats.isFile())              type = {icon: "📄", name: "File"};
 		else if(stats.isSymbolicLink()) type = {icon: "🔗", name: "Link"};
-		else if(stats.isDirectory())   {type = {icon: "📁", name: "Directory"}; name += "/"; }
+		else if(stats.isDirectory())    type = {icon: "📁", name: "Directory"}, name += "/";
 		return Object.assign(stats, {path: absdir, name, type});
 	}).filter(Boolean).sort((a, b) => {
 		if(a.isDirectory() && b.isFile()) return -1;
