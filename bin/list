@@ -1,0 +1,60 @@
+#!/usr/bin/env node
+"use strict";
+
+const {join, resolve} = require("path");
+const fs = require("fs");
+
+module.exports = {
+	findFiles,
+	ls,
+};
+
+// Allow command-line use if needed
+if(require.main === module || global.$0 === __filename){
+	const getOpts = require("get-options");
+	const {options, argv} = getOpts(process.argv.slice(2), {
+		"-e, --extensions": "[list]",
+		"-i, --ignore": "[pattern]",
+		"-0": "",
+	});
+	const [path] = argv;
+	const delimiter = options[0] ? "\0" : "\n";
+	findFiles(path, options.ignore).then(paths => {
+		paths = [...paths.keys()];
+		process.stdout.write(paths.join(delimiter));
+		if(!options[0] && process.stdout.isTTY)
+			process.stdout.write("\n");
+	});
+}
+
+async function findFiles(path, ignorePattern = /(?:^|[\\/])(?:\.git|node_modules)$/i){
+	path = resolve(path || process.cwd());
+	const files = await ls(path);
+	const searches = [];
+	for(const [path, stats] of files)
+		if(stats.isDirectory() && !ignorePattern.test(path))
+			searches.push(findFiles(path));
+	
+	await Promise.all(searches).then(results => {
+		for(const map of results)
+			for(const [path, stats] of map)
+				files.set(path, stats);
+	});
+	return files;
+}
+
+async function ls(path){
+	const files = await new Promise((resolve, reject) => {
+		fs.readdir(path, (error, list) => error
+			? reject(error)
+			: resolve(list));
+	});
+	return new Map([...await Promise.all(
+		files.map(file => new Promise((resolve, reject) => {
+			file = join(path, file);
+			fs.lstat(file, (error, stats) => error
+				? reject(error)
+				: resolve([file, stats]));
+		}))
+	)]);
+}

@@ -2,9 +2,10 @@
 "use strict";
 
 const fs = require("fs");
-const {join, resolve} = require("path");
+const {resolve} = require("path");
 const {spawn} = require("child_process");
 const {findBasePath, which} = require("alhadis.utils");
+const {findFiles} = require("./list");
 const getPath = require("./path");
 
 const JS_EXT = /\.(?:mjs|jsx?)$/i;
@@ -214,37 +215,4 @@ function resolveFileList(paths, extMatch){
 	list = list.map(path => path.replace(cwdExpr, "") || ".");
 	list = Array.from(new Set(list));
 	return list;
-}
-
-
-async function findFiles(path, ignorePattern = /(?:^|[\\/])(?:\.git|node_modules)$/i){
-	path = path || process.cwd();
-	const files = await ls(path);
-	const searches = [];
-	for(const [path, stats] of files)
-		if(stats.isDirectory() && !ignorePattern.test(path))
-			searches.push(findFiles(path));
-	
-	await Promise.all(searches).then(results => {
-		for(const map of results)
-			for(const [path, stats] of map)
-				files.set(path, stats);
-	});
-	return files;
-}
-
-async function ls(path){
-	const files = await new Promise((resolve, reject) => {
-		fs.readdir(path, (error, list) => error
-			? reject(error)
-			: resolve(list));
-	});
-	return new Map([...await Promise.all(
-		files.map(file => new Promise((resolve, reject) => {
-			file = join(path, file);
-			fs.lstat(file, (error, stats) => error
-				? reject(error)
-				: resolve([file, stats]));
-		}))
-	)]);
 }
