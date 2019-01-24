@@ -8,6 +8,7 @@ const {readdirSync} = require("fs");
 let {options, argv} = getOpts(process.argv.slice(2), {
 	"-v, --version": "",
 	"-h, --help": "",
+	"-L": "[exts=\\S+]",
 	"-l, --list": "[exts=\\S+]",
 	"-p, --print-path": "",
 	"-i, --in-place-edit": "[pattern=\\S+]",
@@ -26,17 +27,28 @@ if(options.help){
 	process.exit(0);
 }
 
+// `-L` is an alias for `-l -0`
+if("L" in options)
+	options.list = options.L;
+
+
 // Switches which are aliases/shorthand of subcommands
 if(options.inPlaceEdit)    argv.unshift("edit", "-i");
 else if(options.printPath) argv.unshift("path");
 
 // Process arguments of `jg -l` shorthand
-else if(options.list){
+else if("list" in options){
+	if(!options.list){
+		showUsage();
+		process.exit(1);
+	}
 	const opts = [];
 	const exts = [options.list];
+	options.L && opts.push("-0");
 	for(const arg of argv.slice())
 		("-" === arg[0] ? opts : exts).push(arg);
 	argv = ["list", "-e", exts.join(","), ...opts];
+	+process.env.DEBUG && console.warn("jg: Permuted arguments: ", argv);
 }
 
 // Not enough arguments
@@ -66,7 +78,7 @@ require(path);
 function showUsage(){
 	process.stdout.write([
 		"Usage: jg subcommand [...args]",
-		"       jg [-l|--list] exts",
+		"       jg [-l|--list] ...exts",
 		"       jg [-i|--in-place-edit regexp] [...files]",
 		"       jg [-h|--help]",
 		"       jg [-v|--version]",
