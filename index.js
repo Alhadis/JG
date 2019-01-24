@@ -5,9 +5,10 @@ const getOpts = require("get-options");
 const {join}  = require("path");
 const {readdirSync} = require("fs");
 
-const {options, argv} = getOpts(process.argv.slice(2), {
+let {options, argv} = getOpts(process.argv.slice(2), {
 	"-v, --version": "",
 	"-h, --help": "",
+	"-l, --list": "[exts=\\S+]",
 	"-p, --print-path": "",
 	"-i, --in-place-edit": "[pattern=\\S+]",
 });
@@ -29,6 +30,14 @@ if(options.help){
 if(options.inPlaceEdit)    argv.unshift("edit", "-i");
 else if(options.printPath) argv.unshift("path");
 
+// Process arguments of `jg -l` shorthand
+else if(options.list){
+	const opts = [];
+	const exts = [options.list];
+	for(const arg of argv.slice())
+		("-" === arg[0] ? opts : exts).push(arg);
+	argv = ["list", "-e", exts.join(","), ...opts];
+}
 
 // Not enough arguments
 if(!argv.length){
@@ -36,6 +45,9 @@ if(!argv.length){
 	showUsage();
 	process.exit(1);
 }
+
+// Tolerate `ls` as an alias of `list`; it's too easily confused
+if("ls" === argv[0]) argv[0] = "list";
 
 // Specified command doesn't exist in `./bin` subdirectory
 let path = join(__dirname, "bin");
@@ -54,6 +66,7 @@ require(path);
 function showUsage(){
 	process.stdout.write([
 		"Usage: jg subcommand [...args]",
+		"       jg [-l|--list] exts",
 		"       jg [-i|--in-place-edit regexp] [...files]",
 		"       jg [-h|--help]",
 		"       jg [-v|--version]",
