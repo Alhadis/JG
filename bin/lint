@@ -29,7 +29,7 @@ if(require.main === module || global.$0 === __filename){
 		"-t, --ts": "",
 		"-c, --coffee": "",
 		"-q, --no-echo": "",
-	});
+	}, {noMixedOrder: true, noUndefined: true, terminator: "--"});
 	argv.length || argv.push(".");
 	lint(argv, options);
 }

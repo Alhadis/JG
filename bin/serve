@@ -24,7 +24,7 @@ const {options, argv} = getOpts(process.argv.slice(2), {
 	"-i, --index-dirs": "",
 	"-p, --port":       "[number=\\d+]",
 	"-P, --print-post": "",
-});
+}, {noMixedOrder: true, noUndefined: true, terminator: "--"});
 const cwd       = process.cwd();
 const port      = Math.max(+options.port, 0) || 1337;
 let root        = argv[0] || cwd;

@@ -12,7 +12,7 @@ let {options, argv} = getOpts(process.argv.slice(2), {
 	"-l, --list": "[exts=\\S+]",
 	"-p, --print-path": "",
 	"-i, --in-place-edit": "[pattern=\\S+]",
-});
+}, {noMixedOrder: true, noUndefined: true, terminator: "--"});
 
 // Show installed version, then terminate
 if(options.version){
