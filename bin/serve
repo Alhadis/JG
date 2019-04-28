@@ -21,14 +21,14 @@ const {
 
 // Resolve CLI switches
 const {options, argv} = getOpts(process.argv.slice(2), {
-	"-i, --index-dirs": "",
+	"-I, --no-index":   "",
 	"-p, --port":       "[number=\\d+]",
 	"-P, --print-post": "",
 }, {noMixedOrder: true, noUndefined: true, terminator: "--"});
 const cwd       = process.cwd();
 const port      = Math.max(+options.port, 0) || 1337;
 let root        = argv[0] || cwd;
-const indexDirs = !!options.indexDirs;
+const noIndex   = !!options.noIndex;
 const printPost = !!options.printPost;
 
 
@@ -117,7 +117,7 @@ const server = HTTP.createServer(async (request, response) => {
 
 server.listen(port);
 console.log(`Serving files from ${root} on port ${port}`);
-indexDirs && console.log("--index-dirs enabled: file-listings will be shown for directories without indexes");
+noIndex   && console.log("--no-index passed: directory indexes will not be displayed");
 printPost && console.log("--print-post enabled: POST bodies will be echoed to stdout");
 
 
@@ -204,7 +204,7 @@ async function getFileForURL(input){
 		}
 		
 		// Generate an HTML directory listing
-		if(indexDirs)
+		if(!noIndex)
 			return {html: await makeIndex(file)};
 	}
 
