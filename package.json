@@ -4,6 +4,7 @@
 	"description": "Angry bastard's toolkit.",
 	"license": "ISC",
 	"bin": {"jg": "index.js"},
+	"engines": {"node": ">=12.4.0"},
 	"dependencies": {
 		"get-options": "^1.2.0",
 		"alhadis.utils": "latest"
