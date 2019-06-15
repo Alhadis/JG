@@ -6,7 +6,9 @@
 	"bin": {"jg": "index.js"},
 	"engines": {"node": ">=12.4.0"},
 	"dependencies": {
-		"get-options": "^1.2.0",
-		"alhadis.utils": "latest"
+		"alhadis.utils": "latest",
+		"eslint": "^5.16.0",
+		"eslint-plugin-import": "^2.17.3",
+		"get-options": "^1.2.0"
 	}
 }
