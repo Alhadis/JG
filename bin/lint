@@ -27,6 +27,7 @@ if(require.main === module || global.$0 === __filename){
 	const {options, argv} = getOpts(process.argv.slice(2), {
 		"-j, --js": "",
 		"-t, --ts": "",
+		"-C, --ignore-config": "",
 		"-c, --coffee": "",
 		"-q, --no-echo": "",
 	}, {noMixedOrder: true, noUndefined: true, terminator: "--"});
@@ -142,9 +143,14 @@ async function run(cmd, args, options = {}){
 async function lintJavaScript(files, options){
 	const args = ["--ext", "mjs,js", "--", ...resolveFileList(files, /\.(?:mjs|jsx?)$/i)];
 	
-	// Test whether ESLint can find a config file
-	const code = await run("eslint", ["--print-config", "."], {...options, stdio: "ignore"});
-	if(2 === code){
+	// Ignore whatever ESLint configs are in the working directory
+	if(options.ignoreConfig){
+		args.unshift("--config", getPath(".eslintrc.json"));
+		delete options.ignoreConfig;
+	}
+	
+	// Otherwise, test if ESLint can find a config file
+	else if(2 === await run("eslint", ["--print-config", "."], {...options, stdio: "ignore"})){
 		const configFile = getPath(".eslintrc.json");
 		+process.env.DEBUG && console.log(`Can't find config. Using ${configFile}`);
 		args.unshift("--config", configFile);
