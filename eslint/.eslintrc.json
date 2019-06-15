@@ -50,10 +50,6 @@
 			"error",
 			"last"
 		],
-		"consistent-this": [
-			"error",
-			"THIS"
-		],
 		"eol-last": "error",
 		"eqeqeq": [
 			"error",
