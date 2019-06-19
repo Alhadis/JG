@@ -1,0 +1,5 @@
+{
+	"source": {
+		"includePattern": "\\.+(mjs|js(on|x)?)$"
+	}
+}
