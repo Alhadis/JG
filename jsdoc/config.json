@@ -1,4 +1,7 @@
 {
+	"plugins": [
+		"./fix-props"
+	],
 	"source": {
 		"includePattern": "\\.+(mjs|js(on|x)?)$"
 	}

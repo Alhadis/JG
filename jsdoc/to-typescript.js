@@ -7,16 +7,24 @@ const {join} = require("path");
 const {exec} = require("alhadis.utils");
 const {readFileSync} = require("fs");
 
-loadFile(process.argv[2]).then(doclets => {
+loadFile(process.argv[2]).then(({doclets, source}) => {
 	const chunks = [];
 	for(const doc of doclets){
 		switch(doc.kind){
 			case "function":
 				if(!doc.memberof)
-					chunks.push(parseFunction(doc));
+					chunks.push(`export declare function ${doc.name}${parseFunction(doc)};`);
+				break;
+			case "constant":
+				if(!doc.memberof)
+					chunks.push(`export declare const ${parseTypedef(doc, false)}`);
 				break;
 			case "typedef":
 				chunks.unshift(parseTypedef(doc));
+				break;
+			case "member":
+				if(!doc.memberof && "global" === doc.scope && doc.name === doc.longname)
+					chunks.push(`export declare let ${parseTypedef(doc, false)}`);
 				break;
 		}
 	}
@@ -26,7 +34,7 @@ loadFile(process.argv[2]).then(doclets => {
 async function loadFile(path){
 	const result = await exec("jsdoc", ["-c", join(__dirname, "config.json"), "-X", path]);
 	const source = readFileSync(path, "utf8");
-	return JSON.parse(result.stdout)
+	const doclets = JSON.parse(result.stdout)
 		.filter(doc => !doc.undocumented && "package" !== doc.kind)
 		.map(doc => {
 			// Stupid hack to fix missing info in `export async function…`
@@ -38,23 +46,30 @@ async function loadFile(path){
 			}
 			return doc;
 		});
+	return {doclets, source};
 }
 
-function parseTypedef(obj){
+function parseTypedef(obj, decl = true){
 	const isObject = /^Object(?:$|[.<])/i;
 	const hasProps = obj.properties && obj.properties.length;
-	
+	if(!obj.type)
+		console.warn(obj);
 	if(hasProps && obj.type.names.some(n => isObject.test(n))){
 		obj.type.names = obj.type.names.filter(n => !isObject.test(n));
 		const props = obj.properties.map(parseProp).join(" ");
-		return `declare type ${obj.name} = `
-			+ (obj.type.names.length ? parseType(obj.type) + " | " : "")
-			+ `{${props.replace(/;$/, "")}};`;
+		const type = (obj.type.names.length ? parseType(obj.type) + " | " : "") + `{${props.replace(/;$/, "")}};`;
+		return decl
+			? `declare type ${obj.name} = ${type}`
+			: `${obj.name}: ${type}`;
 	}
 	let type = parseType(obj.type);
 	if("number[]" === type && hasProps)
 		type = `[${new Array(obj.properties.length).fill("number").join(", ")}]`;
-	return `declare type ${obj.name} = ${type};`
+	else if("Function" === type && obj.params)
+		type = parseFunction(obj, " => ");
+	return decl
+		? `declare type ${obj.name} = ${type};`
+		: `${obj.name}: ${type};`;
 }
 
 function parseProp(obj){
@@ -65,7 +80,7 @@ function parseProp(obj){
 		+ ";";
 }
 
-function parseFunction(obj, exported = true){
+function parseFunction(obj, sep = ": "){
 	const nested = {};
 	const params = obj.params.map(arg => {
 		if(/^([^.]+)\.(.+)/.test(arg.name)){
@@ -74,11 +89,8 @@ function parseFunction(obj, exported = true){
 			return null;
 		}
 		return arg;
-	}).filter(Boolean);
-	return (exported ? "export declare " : "declare ")
-		+ `function ${obj.name}(`
-		+ params.map(arg => parseParam(arg, nested[arg.name])).join(", ")
-		+ `): ${parseReturnType(obj)};`;
+	}).filter(Boolean).map(arg => parseParam(arg, nested[arg.name]));
+	return `(${params.join(", ")})${sep + parseReturnType(obj)}`;
 }
 
 function parseParam(obj, props = null){
@@ -86,7 +98,7 @@ function parseParam(obj, props = null){
 		? ("..." + obj.name)
 		: obj.name + (obj.optional ? "?" : "");
 	result += ": " + (props
-		? `{${props.map(p => parseParam(p)).join(", ")}}`
+		? `{${props.map(p => parseParam(p)).join("; ")}}`
 		: parseType(obj.type, obj.variable));
 	return result;
 }
