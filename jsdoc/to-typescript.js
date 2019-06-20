@@ -1,35 +1,62 @@
-#!/usr/bin/env node
 "use strict";
-
-// Usage: `jg -p jsdoc/to-typescript.js` /path/to/library.mjs
 
 const {join} = require("path");
 const {exec} = require("alhadis.utils");
 const {readFileSync} = require("fs");
 
-loadFile(process.argv[2]).then(({doclets, source}) => {
-	const chunks = [];
+module.exports = {
+	extractTypes,
+	loadFile,
+	parseFunction,
+	parseParam,
+	parseProp,
+	parseReturnType,
+	parseType,
+	parseTypedef,
+};
+
+async function extractTypes(inputFile){
+	const {doclets} = await loadFile(inputFile);
+	const types = [];
 	for(const doc of doclets){
 		switch(doc.kind){
 			case "function":
-				if(!doc.memberof)
-					chunks.push(`export declare function ${doc.name}${parseFunction(doc)};`);
+				doc.memberof || types.push({
+					body: `export declare function ${doc.name}${parseFunction(doc)};`,
+					name: doc.name,
+					type: "function",
+					doclet: doc,
+				});
 				break;
 			case "constant":
-				if(!doc.memberof)
-					chunks.push(`export declare const ${parseTypedef(doc, false)}`);
+				doc.memberof || types.push({
+					body: `export declare const ${parseTypedef(doc, false)}`,
+					name: doc.name,
+					type: "constant",
+					doclet: doc,
+				});
 				break;
 			case "typedef":
-				chunks.unshift(parseTypedef(doc));
+				types.unshift({
+					body: parseTypedef(doc),
+					name: doc.name,
+					type: "typedef",
+					doclet: doc,
+				});
 				break;
 			case "member":
 				if(!doc.memberof && "global" === doc.scope && doc.name === doc.longname)
-					chunks.push(`export declare let ${parseTypedef(doc, false)}`);
+					types.push({
+						body: `export declare let ${parseTypedef(doc, false)}`,
+						name: doc.name,
+						type: "let",
+						doclet: doc,
+					});
 				break;
 		}
 	}
-	process.stdout.write(chunks.join("\n") + "\n");
-});
+	return types;
+}
 
 async function loadFile(path){
 	const result = await exec("jsdoc", ["-c", join(__dirname, "config.json"), "-X", path]);
@@ -85,7 +112,7 @@ function parseFunction(obj, sep = ": "){
 	const params = obj.params.map(arg => {
 		if(/^([^.]+)\.(.+)/.test(arg.name)){
 			(nested[RegExp.$1] = nested[RegExp.$1] || []).push(arg);
-			arg.name = RegExp.$2
+			arg.name = RegExp.$2;
 			return null;
 		}
 		return arg;

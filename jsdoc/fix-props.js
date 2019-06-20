@@ -10,7 +10,7 @@ module.exports.handlers = {
 				const tags = {};
 				const doc = body
 					.replace(/@example((?:[^*@]|(?=@\w|\*\/))*)/g, "")
-					.replace(/{@link[^\}]*}/g, "");
+					.replace(/{@link[^}]*}/g, "");
 				for(const line of doc.replace(/\r?\n/g, "\n").split(/\n+/))
 					if(matchProp.test(line))
 						tags.property = RegExp.$1;
