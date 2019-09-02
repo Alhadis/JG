@@ -1,0 +1,166 @@
+#!/usr/bin/env node
+"use strict";
+
+const fs       = require("fs");
+const path     = require("path");
+const getPath  = require("./path");
+
+let shims      = [];
+const exists   = path => fs.existsSync(path);
+const isFile   = path => exists(path) && fs.lstatSync(path).isFile();
+const isDir    = path => exists(path) && fs.lstatSync(path).isDirectory();
+const isLink   = path => exists(path) && fs.lstatSync(path).isSymbolicLink();
+const debug    = text => +process.env.DEBUG && process.stderr.write(`link: ${text}\n`);
+
+module.exports = {
+	fabricateConfig,
+	isESLintRelated,
+	mkdirp,
+	resolveTarget,
+	shimLink,
+};
+
+
+// Allow use from command-line
+if(require.main === module || global.$0 === __filename){
+	const getOpts = require("get-options");
+	const {options, argv} = getOpts(process.argv.slice(2), {
+		"-c, --config": "[type|path]",
+		"-e, --eslint": "",
+	}, {noMixedOrder: true, noUndefined: true, terminator: "--"});
+	
+	if(options.config){
+		const source = path.isAbsolute(options.config)
+			? options.config
+			: getPath(options.config);
+		fabricateConfig(source);
+	}
+	
+	else if(options.eslint){
+		const modules = `${__dirname}/../node_modules`;
+		if(!shimLink(modules)){
+			fabricateConfig(getPath("eslint"), "@alhadis/eslint-config", true);
+			const deps = Object.keys(require("../package.json").dependencies);
+			for(const dep of deps.filter(isESLintRelated))
+				shimLink(`${modules}/${dep}`);
+		}
+	}
+}
+
+
+
+/**
+ * Create a temporary symlink for a missing project file.
+ *
+ * Stubborn hack to force ESLint v6+ to work when run globally.
+ * Does nothing if something already exists at the given path.
+ *
+ * @param {String} source - Path of packaged file
+ * @param {String} [target=process.cwd()] - Path of project folder
+ * @return {Boolean} Whether or not a symlink was necessary and one was created.
+ * @internal
+ */
+function shimLink(source, target = process.cwd()){
+	source = path.join(...source.split(/[\\/]+/), path.sep);
+	target = path.join(...target.split(/[\\/]+/), path.sep);
+	target = resolveTarget(source, target);
+	if(exists(target)) return false; // Already exists, bail
+}
+
+
+/**
+ * Create a bogus NPM module which aliases/symlinks a package directory.
+ *
+ * @param {String} source - Path to directory which should serve as the package root
+ * @param {String} [name=""] - Name of NPM module, as it resides under `node_modules/`
+ * @param {Boolean} [force=false] - Overwrite existing directories instead of ignoring them
+ * @return {Boolean} Whether a fabricated config directory was needed and/or created.
+ * @internal
+ */
+async function fabricateConfig(source, name = "", force = false){
+	if(!source)
+		throw new TypeError(`No source directory specified`);
+	
+	source = path.join(...source.split(/[\\/]+/), path.sep);
+	name = name || require(path.join(source, "package.json")).name;
+	
+	// Module path already exists in working directory
+	const target = resolveTarget(source, "node_modules/" + name);
+	if(exists(target)){
+		if(!force){
+			debug(`Not overwriting ${target}`);
+			return false;
+		}
+		if(isLink(target) && source === fs.realpathSync(target)){
+			debug(`Already fabricated ${name}`);
+			return false;
+		}
+		
+		// Nuke that shit
+		await rmrf(target);
+	}
+	
+	mkdirp(target);
+	
+}
+
+
+/**
+ * Create intermediate directories as necessary.
+ *
+ * @throws {Error} Raises an exception if a path segment exists and isn't a directory.
+ * @param {String} target - Path of file whose ancestry should be created, if needed.
+ * @returns {void}
+ * @internal
+ */
+function mkdirp(target){
+	if(exists(target)) return;
+	const dirs = target.split(/[\\/]/);
+	const {length} = dirs;
+	for(let i = 0; i < length; ++i){
+		target = dirs.slice(0, i + 2).join(path.sep);
+		if(!exists(target)){
+			+process.env.DEBUG && process.stderr.write(`link: Creating directory: ${target}\n`);
+			fs.mkdirSync(target);
+		}
+		else if(!fs.statSync(target).isDirectory())
+			throw new Error(`Not a directory: ${target}`);
+	}
+}
+
+
+/**
+ * Resolve the full path of a symlink's intended destination.
+ *
+ * @example resolveTarget("src.txt", "/foo") == "/foo/src.txt";
+ * @example resolveTarget("src.txt", "/foo/src.txt") == "/foo/src.txt";
+ * @param {String} source - Path of source file
+ * @param {String} target - Path of destination (containing directory, or actual symlink)
+ * @return {String}
+ * @internal
+ */
+function resolveTarget(source, target){
+	source = path.basename(source);
+	if(exists(target) && fs.statSync(target).isDirectory()
+	|| !exists(target) && isDir(path.dirname(target)))
+		return path.join(target, source);
+	return target;
+}
+
+
+/**
+ * Fathom whether a module name is an ESLint plugin, shared config, or ESLint itself.
+ *
+ * @example isESLintRelated("@user/eslint-config") == true;
+ * @example isESLintRelated("eslint-plugin-name") == true;
+ * @example isESLintRelated("eslint-something") == false;
+ * @param {String} name
+ * @return {Boolean}
+ * @internal
+ */
+function isESLintRelated(name){
+	return (
+		/^eslint-(?:config|plugin)-.+$/.test(name) ||
+		/^@[^@/]+\/eslint-(?:config|plugin)(?:-.+)?$/.test(name)
+	);
+}
