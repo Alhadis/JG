@@ -5,7 +5,137 @@ const {readFileSync} = require("fs");
 
 let input = JSON.parse(readFileSync(process.argv.slice(2)[0], "utf8"));
 input = parseMappings(input);
-console.log(input);
+input = dedupeMappings(input);
+loadSegments(input);
+compareMappings(input);
+
+
+/**
+ * Display the contents of a mapping-list side-by-side.
+ * @param {Object[]} list
+ * @return {void}
+ * @internal
+ */
+function compareMappings(list){
+	for(const entry of unifyMappings(list)){
+		const {file, output} = entry;
+		if(file && "string" === typeof file)
+			entry.file = loadFile(file);
+		
+		let min = new Array(2).fill(Number.POSITIVE_INFINITY);
+		let max = new Array(2).fill(Number.NEGATIVE_INFINITY);
+		for(const out of output){
+			if(out.line < min[0] || out.line === min[0] && out.column < min[1]) min = [out.line, out.column];
+			if(out.line > max[0] || out.line === max[0] && out.line   > max[1]) max = [out.line, out.column];
+			if(out.file && "string" === typeof out.file)
+				out.file = loadFile(out.file);
+		}
+		const newlines = /\r?\n|\r/g;
+		let numLines   = (entry.text.match(newlines) || [0]).length;
+		let inputText  = entry.file.lines.slice(entry.line, entry.line + numLines);
+		inputText = inputText.map((text, index, list) => {
+			const gutterWidth = (list.length + entry.line).toString().length;
+			const lineNumber  = (index + entry.line).toString().padStart(gutterWidth);
+			return `${lineNumber}\x1B[38;5;16m│ \x1B[38;5;8m${text}\x1B[0m`;
+		});
+		inputText = [...new Set(inputText)].join("\n");
+		console.log(inputText);
+		
+		// Assumption: No output tokens will be split between two different files
+		const outputText = (min[0] === max[0]
+			? output[0].file.lines[min[0]]
+			: output[0].file.slice(min, max)).split();
+	}
+}
+
+
+/**
+ * Replace identical mapping-points with references to a shared instance.
+ * @param  {Object[]} list
+ * @return {Object[]}
+ * @internal
+ */
+function dedupeMappings(list){
+	const inputs  = Object.create(null);
+	const outputs = Object.create(null);
+	list = list.map(x => ({...x})); // Don't mutate input
+	for(const mapping of list){
+		const {input, output} = mapping;
+		const inputKey  = [input.file,  input.line,  input.column].join(":");
+		const outputKey = [output.file, output.line, output.column].join(":");
+		inputs[inputKey]   ? mapping.input  = inputs[inputKey]   : inputs[inputKey]   = input;
+		outputs[outputKey] ? mapping.output = outputs[outputKey] : outputs[outputKey] = output;
+	}
+	return list;
+}
+
+
+/**
+ * Load a file's contents from disk, reusing an earlier result if possible.
+ * @example <caption>Structure of returned object</caption>
+ *    loadFile("foo.js") => {
+ *       path: "foo.js",
+ *       lines: ["#!/usr/bin/env node", "'use strict';", "etc();"],
+ *    };
+ * @param {String} path - Pathname of file to load
+ * @return {{path: String, lines: String[]}}
+ * @internal
+ */
+function loadFile(path){
+	const cache = loadFile.cache = loadFile.cache || new Map();
+	if(cache.has(path))
+		return cache.get(path);
+	const data = readFileSync(path, "utf8");
+	const file = {
+		path,
+		lines: data.split(/\r?\n|\r/),
+		slice(from, to){
+			if(to[0] < from[0] || to[0] === from[0] && to[1] < from[1])
+				[from, to] = [to, from];
+			if(from[0] === to[0])
+				return this.lines[from[0]].slice(from[1], to[1]);
+			const output = this.lines.slice(from[0], to[0] + 1);
+			output[0] = output[0].slice(from[1]);
+			output[output.length - 1] = output[output.length - 1].slice(0, to[1]);
+			return output.join("\n");
+		},
+	};
+	Object.defineProperty(file, "slice", {enumerable: false});
+	cache.set(path, file);
+	return file;
+}
+
+
+/**
+ * Load the text-content for each segment of a mapping list.
+ * @param {Object[]} list
+ * @return {Object[]}
+ * @internal
+ */
+function loadSegments(list){
+	const loaded = new WeakSet();
+	let prevInput, prevOutput;
+	for(const mapping of list){
+		const {input, output} = mapping;
+		if(null != prevInput && !loaded.has(prevInput)){
+			const file = loadFile(prevInput.file);
+			const from = [prevInput.line, prevInput.column];
+			const to   = [input.line,     input.column];
+			prevInput.text = file.slice(from, to);
+			loaded.add(prevInput);
+		}
+		if(null != prevOutput && !loaded.has(prevOutput)){
+			const file = loadFile(prevOutput.file);
+			const from = [prevOutput.line, prevOutput.column];
+			const to   = [output.line,     output.column];
+			prevOutput.text = file.slice(from, to);
+			loaded.add(prevOutput);
+		}
+		prevInput  = input;
+		prevOutput = output;
+	}
+	return list;
+}
 
 
 /**
@@ -13,7 +143,7 @@ console.log(input);
  *
  * @example <caption>Structure of returned object</caption>
  *    let map = JSON.parse(fs.readFileSync("bar.js.map"));
- *    expandMappings(map) => [{
+ *    parseMappings(map) => [{
  *       {input:  {line: 0, column: 0, file: "foo.js"}},
  *       {output: {line: 0, column: 0, file: "bar.js"}},
  *    },{
@@ -45,6 +175,39 @@ function parseMappings(map){
 		outputColumn = 0;
 	}
 	return mappings;
+}
+
+
+/**
+ * Collate the input/output mappings into a single-level array.
+ *
+ * Assumes a unidirectional relationship between output objects
+ * and their parent (input) objects.
+ *
+ * @param {Object[]} map
+ * @return {Object[]}
+ * @internal
+ */
+function unifyMappings(list){
+	const unified = new Map();
+	for(const mapping of list){
+		const {input, output} = mapping;
+		unified.has(input)
+			? unified.get(input).add(output)
+			: unified.set(input, new Set([output]));
+	}
+	const results = [];
+	for(const [input, output] of unified)
+		results.push({...input, output: [...output].sort((a, b) => {
+			// Don't assume output tokens are in any particular order
+			if(a.file !== b.file) return a.file.localeCompare(b.file);
+			if(a.line < b.line)     return -1;
+			if(a.line > b.line)     return +1;
+			if(a.column < b.column) return -1;
+			if(a.column > b.column) return +1;
+			return 0;
+		})});
+	return results;
 }
 
 
