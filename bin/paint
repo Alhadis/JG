@@ -1,0 +1,318 @@
+#!/usr/bin/env node
+"use strict";
+
+const {readFileSync} = require("fs");
+const {readStdin} = require("alhadis.utils");
+
+
+// Handler called when file is loaded as an executable
+async function main(){
+	const getOpts = require("get-options");
+	const {options, argv} = getOpts(process.argv.slice(2), {
+		"-h, --highlight": "[start] [end] [before] [after]",
+		"-n, --show-numbers": "",
+	}, {noMixedOrder: true, noUndefined: true, terminator: "--"});
+	
+	console.log({options, argv});
+	const buffer = (argv[0] && argv[0] !== "-")
+		? TextBuffer.load(argv[0])
+		: new TextBuffer(await readStdin(), 1);
+	process.stdout.write(buffer.format(options));
+}
+
+
+/**
+ * A variable-length buffer of plain-text data.
+ * @public
+ * @class
+ */
+class TextBuffer extends Array {
+	static [Symbol.species] = Array;
+	
+	/**
+	 * Load the contents of a file from disk.
+	 * 
+	 * @param  {String} path - Pathname of file to load
+	 * @param  {String} [encoding="utf8"] - Character encoding of input
+	 * @return {TextBuffer}
+	 * @public
+	 */
+	static load(path, encoding = "utf8"){
+		return new this(readFileSync(path, encoding));
+	}
+	
+	
+	/**
+	 * Initialise a new buffer, optionally propagating it with data.
+	 *
+	 * @param {String} [data=""]
+	 * @param {Number} [startIndex=0]
+	 * @constructor
+	 * @public
+	 */
+	constructor(data = "", startIndex = 0){
+		super(...data.split(/(?<=\r?\n|\r(?!\n))(?=^)/m)
+			.map((s, i) => new Line(s, i + startIndex)));
+		this.#startIndex = startIndex;
+	}
+	
+	
+	/**
+	 * @member  {Number} startIndex
+	 * @summary Value to start numbering lines from.
+	 * @desc    Setting this property will update the index of every
+	 *          {@link Line} currently held by the buffer object.
+	 */
+	#startIndex = 0;
+	get startIndex(){ return this.#startIndex; }
+	set startIndex(to){
+		if(Number.isNaN(to = Math.max(+to, 0)) || to === this.#startIndex) return;
+		this.#startIndex = to;
+		this.forEach((line, index) => line.index = index + to);
+	}
+	
+	
+	/**
+	 * Convert the buffer to an SGR-encoded string for terminal display.
+	 *
+	 * @param {FormatOptions} [opts={}]
+	 * @return {String}
+	 * @public
+	 */
+	format(opts = {}){
+		/**
+		 * @typedef  {Object}  FormatOptions
+		 * @property {Boolean} [showNumbers  = false]
+		 * @property {String}  [gutterStyle  = ANSI.reset]
+		 * @property {String}  [divider      = ANSI.reset + "│ "]
+		 * @property {String}  [beforeLine   = ANSI.grey]
+		 * @property {String}  [afterLine    = ANSI.reset]
+		 */
+		const {
+			showNumbers  = false,
+			gutterStyle  = ANSI.reset,
+			dividerText  = "│ ",
+			dividerStyle = ANSI.reset,
+			lineStyle    = ANSI.fg(8),
+		} = opts;
+		
+		return this.map(line => {
+			let text = lineStyle + line.join() + "";
+			return text;
+		}).join(""); // TODO
+	}
+	
+	
+	/**
+	 * Concatenate each line and return the result.
+	 * @return {String}
+	 */
+	join(){
+		return super.join("");
+	}
+	
+	
+	/**
+	 * Convert the buffer to its string representation using {@link TextBuffer#format}.
+	 * @param  {FormatOptions} [opts={}]
+	 * @return {String}
+	 * @public
+	 */
+	toString(opts = {}){
+		return this.format(opts);
+	}
+	
+	
+	/**
+	 * Extract a range of {@link Char} objects from the buffer.
+	 *
+	 * Unless both arguments are arrays of the form `[line, column]`,
+	 * the method acts similarly to {@link Array.prototype.slice}.
+	 *
+	 * @example thisFile.slice([1,0], [1,13]).join("") == '"use strict";';
+	 * @param  {Number|Number[]} from
+	 * @param  {Number|Number[]} to
+	 * @return {Char[]}
+	 */
+	slice(from, to){
+		if(Array.isArray(from) && Array.isArray(to)){
+			if(to[0] < from[0] || to[0] === from[0] && to[1] < from[1])
+				[from, to] = [to, from];
+			
+			// Single-line slice
+			if(from[0] === to[0])
+				return this[from[0]].slice(from[1], to[1]).flat(9);
+			
+			// Multi-line slice
+			const lines = super.slice(from[0], to[0]);
+			lines[0] = lines[0].slice(from[1]);
+			lines[lines.length - 1] = lines[lines.length - 1].slice(0, to[1]);
+			return lines.flat(9);
+		}
+		return super.slice(from, to);
+	}
+}
+
+
+/**
+ * A row of {@link Cell|Cells} containing character data.
+ * @public
+ * @class
+ */
+class Line extends Array {
+	static [Symbol.species] = Array;
+	terminator = "";
+	#index = 0;
+	
+	constructor(data = "", index = 0){
+		data = [...data];
+		let terminator = "";
+		if("\n" === data[data.length - 1]) terminator = data.pop();
+		if("\r" === data[data.length - 1]) terminator = data.pop() + terminator;
+		super(...data.map((s, i) => new Cell(s, i)));
+		this.terminator = terminator;
+		this.index      = index;
+	}
+	
+	get index(){
+		return this.#index;
+	}
+	set index(to){
+		if(Number.isNaN(to = +to)) return;
+		this.#index = Math.max(to, 0);
+	}
+	
+	slice(...args){
+		const cells = [...this];
+		if(this.terminator)
+			cells.push(this.terminator);
+		return super.slice.apply(cells, args);
+	}
+	
+	join(){
+		return super.join("") + this.terminator;
+	}
+	
+	toString(){
+		return this.join();
+	}
+}
+
+
+/**
+ * A single grapheme representing one column of text.
+ * @public
+ * @class
+ */
+class Cell {
+	before = "";
+	after  = "";
+	text   = "";
+	#index = 0;
+	
+	constructor(text, index = 0){
+		this.text = String(text || "");
+		this.index = index;
+	}
+	
+	get index(){
+		return this.#index;
+	}
+	set index(to){
+		if(Number.isNaN(to = +to)) return;
+		this.#index = Math.max(to, 0);
+	}
+	
+	toString(){
+		return this.before + this.text + this.after;
+	}
+}
+
+
+/**
+ * Enumeration of SGR escape sequences, emptied if target stream isn't a TTY.
+ * @todo Delete this class once I realise how retarded it is.
+ * @internal
+ * @class
+ */
+class ANSI{
+	static reset    = "\x1B[0m";
+	static bold     = "\x1B[1m";
+	static ul       = "\x1B[4m";
+	static invert   = "\x1B[7m";
+	static unbold   = "\x1B[22m";
+	static noline   = "\x1B[24m";
+	static noinvert = "\x1B[27m";
+	static fg       = n => null == n ? `\x1B[39m` : `\x1B[38;5;${n}m`;
+	static bg       = n => null == n ? `\x1B[49m` : `\x1B[48;5;${n}m`;
+	
+	
+	/**
+	 * Initialise a new set of escape codes.
+	 * @param {WriteStream} stream
+	 * @constructor
+	 */
+	constructor(stream){
+		for(const key of Object.keys(this.constructor)){
+			const value = this.constructor[key];
+			switch(typeof value){
+				case "string":   this[key] = value;            break;
+				case "function": this[key] = value.bind(this); break;
+			}
+		}
+		const names = "black red green yellow blue pink cyan white".split(" ");
+		names.forEach((colour, index) => {
+			this.fg[colour] = `\x1B[${30 + index}m`;
+			this.bg[colour] = `\x1B[${40 + index}m`;
+		});
+		names.forEach((colour, index) => {
+			colour = index ? "bright" + (colour[0].toUpperCase() + colour.substr(1)) : "grey";
+			this.fg[colour] = `\x1B[38;5;${8 + index}m`;
+			this.bg[colour] = `\x1B[48;5;${8 + index}m`;
+		});
+		Object.assign(this, this.fg); // Shorthand
+		stream.isTTY || this.clearCodes();
+		return codes;
+	}
+	
+	
+	/**
+	 * Remove every SGR code assigned by the constructor.
+	 * @internal
+	 */
+	clearCodes(){
+		this.fg = Object.assign(n => "", this.fg);
+		this.bg = Object.assign(n => "", this.bg);
+		const entries = [this, this.fg, this.bg].map(Object.entries).flat(1);
+		console.log(entries);
+		for(const [key, value] of entries)
+			if("string" === typeof value)
+				this[key] = "";
+	}
+	
+	
+	/**
+	 * Display a preview of each SGR code on the target stream.
+	 * @internal
+	 */
+	preview(){
+		for(const [key, value] of [
+			...Object.entries(this),
+			...Object.entries(this.fg),
+			...Object.entries(this.bg),
+		]) if(this.stream && "string" === typeof value)
+			this.stream.write(`${value}${key}${this.reset}\n`);
+	}
+}
+
+
+module.exports = {
+	TextBuffer,
+	Line,
+	Cell,
+	ANSI,
+};
+
+// Run with some obvious defaults if invoked directly
+if(require.main === module || global.$0 === __filename)
+	main();

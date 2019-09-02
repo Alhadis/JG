@@ -17,10 +17,12 @@ compareMappings(input);
  * @internal
  */
 function compareMappings(list){
+	const rendered = new Map();
 	for(const entry of unifyMappings(list)){
 		const {file, output} = entry;
 		if(file && "string" === typeof file)
 			entry.file = loadFile(file);
+		Object.defineProperty(entry, "file", {enumerable: false});
 		
 		let min = new Array(2).fill(Number.POSITIVE_INFINITY);
 		let max = new Array(2).fill(Number.NEGATIVE_INFINITY);
@@ -29,23 +31,27 @@ function compareMappings(list){
 			if(out.line > max[0] || out.line === max[0] && out.line   > max[1]) max = [out.line, out.column];
 			if(out.file && "string" === typeof out.file)
 				out.file = loadFile(out.file);
+			Object.defineProperty(out, "file", {enumerable: false});
 		}
-		const newlines = /\r?\n|\r/g;
-		let numLines   = (entry.text.match(newlines) || [0]).length;
-		let inputText  = entry.file.lines.slice(entry.line, entry.line + numLines);
-		inputText = inputText.map((text, index, list) => {
-			const gutterWidth = (list.length + entry.line).toString().length;
-			const lineNumber  = (index + entry.line).toString().padStart(gutterWidth);
-			return `${lineNumber}\x1B[38;5;16m│ \x1B[38;5;8m${text}\x1B[0m`;
-		});
-		inputText = [...new Set(inputText)].join("\n");
-		console.log(inputText);
+		const inputText = entry.file.lines
+			.slice(entry.line, entry.line + (entry.text.match(/\r?\n|\r/g) || [0]).length)
+			.map((text, index, list) => {
+				const gutterWidth = (list.length + entry.line).toString().length;
+				const lineNumber  = (index + entry.line).toString().padStart(gutterWidth);
+				return `${lineNumber}\x1B[38;5;16m│ \x1B[38;5;8m${text}\x1B[0m`;
+			}).join("\n");
 		
 		// Assumption: No output tokens will be split between two different files
+		const {lines} = output[0].file;
 		const outputText = (min[0] === max[0]
-			? output[0].file.lines[min[0]]
-			: output[0].file.slice(min, max)).split();
+			? lines[min[0]]
+			: lines.slice(min[0], max[0]).join("\n"));
+		
+		rendered.has(inputText)
+			? rendered.get(inputText).push(outputText)
+			: rendered.set(inputText, [outputText]);
 	}
+	console.log(rendered);
 }
 
 
