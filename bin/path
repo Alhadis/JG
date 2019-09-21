@@ -47,12 +47,12 @@ function getPath(filename){
 	// Shorthand: TSLint
 	match = filename.match(/^\.?tslint(?:rc|[-/]?config)?(?:\.json)?$/i);
 	if(null !== match)
-		return resolve(join(ROOT_DIR, "tslint", "tslint.json"));
+		return resolve(join(ROOT_DIR, "etc", "tslint.json"));
 
 	// Shorthand: CoffeeLint
 	match = filename.match(/^\.?coffeelint(?:rc|[-/]?config)?(?:\.json)?$/i);
 	if(null !== match)
-		return resolve(join(ROOT_DIR, "coffeelint", "coffeelint.json"));
+		return resolve(join(ROOT_DIR, "etc", "coffeelint.json"));
 	
 	const result = filename
 		? resolve(join(ROOT_DIR, filename))

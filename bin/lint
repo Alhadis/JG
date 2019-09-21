@@ -5,7 +5,6 @@ const fs = require("fs");
 const {resolve} = require("path");
 const {spawn} = require("child_process");
 const {findBasePath, which} = require("alhadis.utils");
-const {shimESLint, pruneShims} = require("./link");
 const {findFiles} = require("./list");
 const getPath = require("./path");
 
@@ -143,7 +142,15 @@ async function run(cmd, args, options = {}){
  */
 async function lintJavaScript(files, options){
 	const args = ["--ext", "mjs,js", "--", ...resolveFileList(files, /\.(?:mjs|jsx?)$/i)];
-	shimESLint();
+	let linked = false;
+	
+	// Stubborn hack to force ESLint v6+ to work when run globally
+	if(!fs.existsSync("node_modules")){
+		linked = resolve("node_modules");
+		const source = resolve(__dirname, "..", "node_modules");
+		+process.env.DEBUG && console.log(`Linking: ${source} -> ${linked}`);
+		fs.symlinkSync(source, linked);
+	}
 	
 	// Ignore whatever ESLint configs are in the working directory
 	if(options.ignoreConfig){
@@ -159,7 +166,10 @@ async function lintJavaScript(files, options){
 		args.unshift("--config", configFile);
 	}
 	const code = await run("eslint", args, options);
-	pruneShims();
+	if(linked){
+		+process.env.DEBUG && console.log(`Unlinking: ${linked}`);
+		fs.unlinkSync(linked);
+	}
 	return code;
 }
 
