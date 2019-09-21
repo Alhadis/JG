@@ -5,6 +5,7 @@ const fs = require("fs");
 const {resolve} = require("path");
 const {spawn} = require("child_process");
 const {findBasePath, which} = require("alhadis.utils");
+const {shimESLint, pruneShims} = require("./link");
 const {findFiles} = require("./list");
 const getPath = require("./path");
 
@@ -142,20 +143,24 @@ async function run(cmd, args, options = {}){
  */
 async function lintJavaScript(files, options){
 	const args = ["--ext", "mjs,js", "--", ...resolveFileList(files, /\.(?:mjs|jsx?)$/i)];
+	shimESLint();
 	
 	// Ignore whatever ESLint configs are in the working directory
 	if(options.ignoreConfig){
 		args.unshift("--config", getPath(".eslintrc.json"));
+		args.unshift("--resolve-plugins-relative-to", getPath("."));
 		delete options.ignoreConfig;
 	}
 	
 	// Otherwise, test if ESLint can find a config file
-	else if(2 === await run("eslint", ["--print-config", "."], {...options, stdio: "ignore"})){
+	else if(2 === await run("eslint", ["--print-config", "-"], {...options, stdio: "ignore"})){
 		const configFile = getPath(".eslintrc.json");
 		+process.env.DEBUG && console.log(`Can't find config. Using ${configFile}`);
 		args.unshift("--config", configFile);
 	}
-	return run("eslint", args, options);
+	const code = await run("eslint", args, options);
+	pruneShims();
+	return code;
 }
 
 

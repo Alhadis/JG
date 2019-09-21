@@ -73,37 +73,6 @@ class TextBuffer extends Array {
 	
 	
 	/**
-	 * Convert the buffer to an SGR-encoded string for terminal display.
-	 *
-	 * @param {FormatOptions} [opts={}]
-	 * @return {String}
-	 * @public
-	 */
-	format(opts = {}){
-		/**
-		 * @typedef  {Object}  FormatOptions
-		 * @property {Boolean} [showNumbers  = false]
-		 * @property {String}  [gutterStyle  = ANSI.reset]
-		 * @property {String}  [divider      = ANSI.reset + "│ "]
-		 * @property {String}  [beforeLine   = ANSI.grey]
-		 * @property {String}  [afterLine    = ANSI.reset]
-		 */
-		const {
-			showNumbers  = false,
-			gutterStyle  = ANSI.reset,
-			dividerText  = "│ ",
-			dividerStyle = ANSI.reset,
-			lineStyle    = ANSI.fg(8),
-		} = opts;
-		
-		return this.map(line => {
-			let text = lineStyle + line.join() + "";
-			return text;
-		}).join(""); // TODO
-	}
-	
-	
-	/**
 	 * Concatenate each line and return the result.
 	 * @return {String}
 	 */
@@ -229,88 +198,10 @@ class Cell {
 }
 
 
-/**
- * Enumeration of SGR escape sequences, emptied if target stream isn't a TTY.
- * @todo Delete this class once I realise how retarded it is.
- * @internal
- * @class
- */
-class ANSI{
-	static reset    = "\x1B[0m";
-	static bold     = "\x1B[1m";
-	static ul       = "\x1B[4m";
-	static invert   = "\x1B[7m";
-	static unbold   = "\x1B[22m";
-	static noline   = "\x1B[24m";
-	static noinvert = "\x1B[27m";
-	static fg       = n => null == n ? `\x1B[39m` : `\x1B[38;5;${n}m`;
-	static bg       = n => null == n ? `\x1B[49m` : `\x1B[48;5;${n}m`;
-	
-	
-	/**
-	 * Initialise a new set of escape codes.
-	 * @param {WriteStream} stream
-	 * @constructor
-	 */
-	constructor(stream){
-		for(const key of Object.keys(this.constructor)){
-			const value = this.constructor[key];
-			switch(typeof value){
-				case "string":   this[key] = value;            break;
-				case "function": this[key] = value.bind(this); break;
-			}
-		}
-		const names = "black red green yellow blue pink cyan white".split(" ");
-		names.forEach((colour, index) => {
-			this.fg[colour] = `\x1B[${30 + index}m`;
-			this.bg[colour] = `\x1B[${40 + index}m`;
-		});
-		names.forEach((colour, index) => {
-			colour = index ? "bright" + (colour[0].toUpperCase() + colour.substr(1)) : "grey";
-			this.fg[colour] = `\x1B[38;5;${8 + index}m`;
-			this.bg[colour] = `\x1B[48;5;${8 + index}m`;
-		});
-		Object.assign(this, this.fg); // Shorthand
-		stream.isTTY || this.clearCodes();
-		return codes;
-	}
-	
-	
-	/**
-	 * Remove every SGR code assigned by the constructor.
-	 * @internal
-	 */
-	clearCodes(){
-		this.fg = Object.assign(n => "", this.fg);
-		this.bg = Object.assign(n => "", this.bg);
-		const entries = [this, this.fg, this.bg].map(Object.entries).flat(1);
-		console.log(entries);
-		for(const [key, value] of entries)
-			if("string" === typeof value)
-				this[key] = "";
-	}
-	
-	
-	/**
-	 * Display a preview of each SGR code on the target stream.
-	 * @internal
-	 */
-	preview(){
-		for(const [key, value] of [
-			...Object.entries(this),
-			...Object.entries(this.fg),
-			...Object.entries(this.bg),
-		]) if(this.stream && "string" === typeof value)
-			this.stream.write(`${value}${key}${this.reset}\n`);
-	}
-}
-
-
 module.exports = {
 	TextBuffer,
 	Line,
 	Cell,
-	ANSI,
 };
 
 // Run with some obvious defaults if invoked directly

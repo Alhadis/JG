@@ -7,8 +7,24 @@
 	"engines": {"node": ">=12.4.0"},
 	"dependencies": {
 		"alhadis.utils": "latest",
-		"eslint": "^6.1.0",
+		"eslint": "^6.4.0",
 		"eslint-plugin-import": "^2.18.2",
 		"get-options": "^1.2.0"
+	},
+	"devDependencies": {
+		"babel-eslint": "^10.0.3",
+		"chai":         "^4.2.0",
+		"chinotto":     "^1.0.0",
+		"mocha":        "^6.2.0",
+		"mocha-when":   "^1.0.1"
+	},
+	"eslintConfig": {
+		"extends": "@alhadis",
+		"parser": "babel-eslint",
+		"overrides": [{
+			"files": ["test/*.js"],
+			"rules": {"indent": 0},
+			"globals": {"expect": true, "when": true}
+		}]
 	}
 }

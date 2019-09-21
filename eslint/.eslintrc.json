@@ -6,8 +6,9 @@
 		"mocha": true,
 		"node": true
 	},
+	"noInlineConfig": true,
 	"parserOptions": {
-		"ecmaVersion": 2019,
+		"ecmaVersion": 2020,
 		"sourceType": "module"
 	},
 	"plugins": ["import"],
@@ -50,6 +51,7 @@
 			"error",
 			"last"
 		],
+		"default-param-last": "error",
 		"eol-last": "error",
 		"eqeqeq": [
 			"error",
@@ -70,7 +72,13 @@
 			{
 				"ignoreComments": true,
 				"VariableDeclarator": 0,
-				"SwitchCase": 1
+				"SwitchCase": 1,
+				"ignoredNodes": [
+					"ForOfStatement > ForOfStatement",
+					"ForInStatement > ForInStatement",
+					"ForStatement   > ForStatement",
+					"WhileStatement > WhileStatement"
+				]
 			}
 		],
 		"keyword-spacing": [
@@ -118,11 +126,15 @@
 			"error",
 			{"includeExports": true}
 		],
+		"no-buffer-constructor": "error",
 		"no-case-declarations": 0,
 		"no-cond-assign": 0,
 		"no-console": 0,
 		"no-control-regex": 0,
 		"no-empty": 0,
+		"no-import-assign": "error",
+		"no-iterator": "error",
+		"no-new-require": "error",
 		"no-return-await": "error",
 		"no-self-compare": "error",
 		"no-sparse-arrays": 0,
@@ -144,7 +156,13 @@
 		"no-useless-rename": "error",
 		"no-var": "error",
 		"no-with": "error",
-		"prefer-arrow-callback": "error",
+		"prefer-arrow-callback": [
+			"error",
+			{
+				"allowNamedFunctions": true,
+				"allowUnboundThis": true
+			}
+		],
 		"prefer-const": [
 			"error",
 			{"destructuring": "all"}
@@ -165,6 +183,7 @@
 		],
 		"prefer-numeric-literals": "error",
 		"prefer-object-spread": "error",
+		"prefer-regex-literals": "error",
 		"prefer-rest-params": "error",
 		"prefer-spread": "error",
 		"quotes": [
@@ -187,7 +206,8 @@
 		],
 		"spaced-comment": [
 			"error",
-			"always"
+			"always",
+			{"exceptions": [",", "#__PURE__", "@__PURE__"]}
 		],
 		"space-before-function-paren": [
 			"error",

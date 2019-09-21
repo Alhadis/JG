@@ -4,8 +4,9 @@
 const fs       = require("fs");
 const path     = require("path");
 const getPath  = require("./path");
+const {rmrf}   = require("alhadis.utils");
 
-let shims      = [];
+const shims    = [];
 const exists   = path => fs.existsSync(path);
 const isFile   = path => exists(path) && fs.lstatSync(path).isFile();
 const isDir    = path => exists(path) && fs.lstatSync(path).isDirectory();
@@ -17,6 +18,8 @@ module.exports = {
 	isESLintRelated,
 	mkdirp,
 	resolveTarget,
+	pruneShims,
+	shimESLint,
 	shimLink,
 };
 
@@ -36,14 +39,24 @@ if(require.main === module || global.$0 === __filename){
 		fabricateConfig(source);
 	}
 	
-	else if(options.eslint){
-		const modules = `${__dirname}/../node_modules`;
-		if(!shimLink(modules)){
-			fabricateConfig(getPath("eslint"), "@alhadis/eslint-config", true);
-			const deps = Object.keys(require("../package.json").dependencies);
-			for(const dep of deps.filter(isESLintRelated))
-				shimLink(`${modules}/${dep}`);
-		}
+	else if(options.eslint)
+		shimESLint();
+}
+
+
+/**
+ * Create symlinks for ESLint-related dependencies, if needed.
+ * @internal
+ */
+function shimESLint(){
+	const modules = path.resolve(`${__dirname}/../node_modules`);
+	if(isLink("node_modules") && modules === path.resolve(fs.readlinkSync("node_modules")))
+		debug(`Already symlinked: ${path.resolve("node_modules")}`);
+	else if(!shimLink(modules)){
+		fabricateConfig(getPath("./eslint"), "@alhadis/eslint-config", true);
+		const deps = Object.keys(require("../package.json").dependencies);
+		for(const dep of deps.filter(isESLintRelated))
+			shimLink(`${modules}/${dep}`, "node_modules");
 	}
 }
 
@@ -61,10 +74,33 @@ if(require.main === module || global.$0 === __filename){
  * @internal
  */
 function shimLink(source, target = process.cwd()){
-	source = path.join(...source.split(/[\\/]+/), path.sep);
-	target = path.join(...target.split(/[\\/]+/), path.sep);
+	source = path.resolve(source.replace(/[\\/]+/g, path.sep));
+	target = path.resolve(target.replace(/[\\/]+/g, path.sep));
 	target = resolveTarget(source, target);
-	if(exists(target)) return false; // Already exists, bail
+	if(exists(target)){
+		debug(`Already exists: ${target}`);
+		return false;
+	}
+	debug(`Symlinking: ${source} -> ${target}`);
+	fs.symlinkSync(source, target);
+	return !!shims.push(target);
+}
+
+
+/**
+ * Delete all temporary symlinks created during the current process.
+ * @internal
+ */
+function pruneShims(){
+	while(shims.length){
+		const link = shims.pop();
+		if(!isLink(link)){
+			debug(`Not a symlink: ${link}`);
+			continue;
+		}
+		debug(`Unlinking ${link}`);
+		fs.unlinkSync(link);
+	}
 }
 
 
@@ -79,9 +115,9 @@ function shimLink(source, target = process.cwd()){
  */
 async function fabricateConfig(source, name = "", force = false){
 	if(!source)
-		throw new TypeError(`No source directory specified`);
+		throw new TypeError("No source directory specified");
 	
-	source = path.join(...source.split(/[\\/]+/), path.sep);
+	source = source.replace(/[\\/]+/g, path.sep);
 	name = name || require(path.join(source, "package.json")).name;
 	
 	// Module path already exists in working directory
@@ -97,11 +133,14 @@ async function fabricateConfig(source, name = "", force = false){
 		}
 		
 		// Nuke that shit
+		debug(`Deleting ${target}`);
 		await rmrf(target);
 	}
 	
-	mkdirp(target);
-	
+	mkdirp(path.dirname(target));
+	debug(`Symlinking: ${source} -> ${target}`);
+	fs.symlinkSync(source, target);
+	return true;
 }
 
 
@@ -120,7 +159,7 @@ function mkdirp(target){
 	for(let i = 0; i < length; ++i){
 		target = dirs.slice(0, i + 2).join(path.sep);
 		if(!exists(target)){
-			+process.env.DEBUG && process.stderr.write(`link: Creating directory: ${target}\n`);
+			debug(`Creating directory: ${target}`);
 			fs.mkdirSync(target);
 		}
 		else if(!fs.statSync(target).isDirectory())
@@ -141,10 +180,18 @@ function mkdirp(target){
  */
 function resolveTarget(source, target){
 	source = path.basename(source);
-	if(exists(target) && fs.statSync(target).isDirectory()
-	|| !exists(target) && isDir(path.dirname(target)))
-		return path.join(target, source);
-	return target;
+	if(isDir(target))  return path.join(target, source);
+	if(exists(target)) return target;
+	const {dir, base} = path.parse(path.resolve(target));
+	if(exists(dir)){
+		if(!fs.statSync(dir).isDirectory())
+			throw new Error(`Not a directory: ${dir}`);
+		return path.join(dir, base);
+	}
+	else{
+		mkdirp(dir);
+		return path.join(dir, base);
+	}
 }
 
 
