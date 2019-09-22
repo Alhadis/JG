@@ -4,7 +4,7 @@
 const fs = require("fs");
 const {resolve} = require("path");
 const {spawn} = require("child_process");
-const {findBasePath, which} = require("alhadis.utils");
+const {findBasePath, which, smartSplit} = require("alhadis.utils");
 const {findFiles} = require("./list");
 const getPath = require("./path");
 
@@ -29,6 +29,7 @@ if(require.main === module || global.$0 === __filename){
 		"-t, --ts": "",
 		"-C, --ignore-config": "",
 		"-c, --coffee": "",
+		"-E, --eslint-options": "[opts]",
 		"-q, --no-echo": "",
 	}, {noMixedOrder: true, noUndefined: true, terminator: "--"});
 	argv.length || argv.push(".");
@@ -164,6 +165,13 @@ async function lintJavaScript(files, options){
 		const configFile = getPath(".eslintrc.json");
 		+process.env.DEBUG && console.log(`Can't find config. Using ${configFile}`);
 		args.unshift("--config", configFile);
+	}
+	
+	// Lastly, allow arbitrary options to be passed directly to ESLint
+	if(options.eslintOptions){
+		const extraOpts = smartSplit(options.eslintOptions);
+		+process.env.DEBUG && console.log(`Prepending options: ${extraOpts}`);
+		args.unshift(...extraOpts);
 	}
 	const code = await run("eslint", args, options);
 	if(linked){
