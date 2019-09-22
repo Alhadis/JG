@@ -54,6 +54,11 @@ function getPath(filename){
 	if(null !== match)
 		return resolve(join(ROOT_DIR, "etc", "coffeelint.json"));
 	
+	// Shorthand: JSDoc config
+	match = filename.match(/^\.?jsdoc(?:rc)?\.(?:conf|json|cfg)$/i);
+	if(null !== match)
+		return resolve(join(ROOT_DIR, "jsdoc", "config.json"));
+	
 	const result = filename
 		? resolve(join(ROOT_DIR, filename))
 		: resolve(ROOT_DIR);
