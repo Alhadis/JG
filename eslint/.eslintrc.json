@@ -37,7 +37,7 @@
 			"error",
 			"always",
 			{
-				"ignorePattern": "camelCased|camelCase|gropdf|xterm",
+				"ignorePattern": "camelCased|camelCase|gropdf|macOS|xterm",
 				"ignoreInlineComments": true,
 				"ignoreConsecutiveComments": true
 			}
@@ -132,6 +132,7 @@
 		"no-console": 0,
 		"no-control-regex": 0,
 		"no-empty": 0,
+		"no-ex-assign": 0,
 		"no-import-assign": "error",
 		"no-iterator": "error",
 		"no-new-require": "error",
