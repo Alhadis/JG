@@ -75,7 +75,7 @@ const server = HTTP.createServer(async (request, response) => {
 		`.trim().replace(/^\t+(?=<[/\w])/gm, "");
 		response.writeHead(200, {
 			"Content-Type": "text/html; charset=UTF-8",
-			"Last-Modified": new Date(fs.lstatSync(wrapperPath).mtime),
+			"Last-Modified": new Date(fs.lstatSync(wrapperPath).mtime).toUTCString(),
 		});
 		response.write(html);
 		return response.end();
@@ -107,7 +107,7 @@ const server = HTTP.createServer(async (request, response) => {
 		"Content-Type": getContentType(file),
 		"Cache-Control": "max-age=864000",
 		"Content-Length": stats.size,
-		"Last-Modified": new Date(stats.mtime),
+		"Last-Modified": new Date(stats.mtime).toUTCString(),
 	});
 	if("GET" === request.method)
 		await send(file, response);
@@ -130,6 +130,7 @@ printPost && console.log("--print-post enabled: POST bodies will be echoed to st
 function getContentType(filePath){
 	const types = {
 		apng:  "image/png",
+		appcache: "text/cache-manifest",
 		css:   "text/css",
 		eot:   "application/vnd.ms-fontobject",
 		flac:  "audio/flac",
@@ -139,9 +140,10 @@ function getContentType(filePath){
 		ico:   "image/x-icon",
 		jpeg:  "image/jpeg",
 		jpg:   "image/jpeg",
-		js:    "application/javascript",
+		js:    "text/javascript",
 		json:  "application/json",
-		mjs:   "application/javascript",
+		map:   "application/json",
+		mjs:   "text/javascript",
 		mka:   "audio/x-matroska",
 		mkv:   "video/x-matroska",
 		mp3:   "audio/mpeg",
@@ -150,17 +152,20 @@ function getContentType(filePath){
 		ogv:   "video/ogg",
 		ogg:   "application/ogg",
 		otf:   "font/otf",
+		pdf:   "application/pdf",
 		png:   "image/png",
 		svg:   "image/svg+xml",
 		ttf:   "font/ttf",
 		txt:   "text/plain",
 		vtt:   "text/vtt",
+		wasm:  "application/wasm",
 		wav:   "audio/x-wav",
 		webmanifest: "application/manifest+json",
 		webm:  "video/webm",
 		webp:  "image/webp",
 		woff:  "font/woff",
 		woff2: "font/woff2",
+		xml:   "text/xml",
 	};
 	const defaultType = "text/plain";
 	return /\.([-\w]+)$/.test(filePath)
