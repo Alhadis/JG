@@ -1,4 +1,11 @@
 {
 	"name": "@alhadis/eslint-config",
-	"version": "v0.0.0"
+	"version": "v2.0.0",
+	"description": "Shareable version of my ESLint config.",
+	"repository": "https://github.com/Alhadis/JG/tree/master/eslint",
+	"license": "ISC",
+	"keywords": ["eslint", "eslintconfig"],
+	"scripts": {"test": "eslint ."},
+	"peerDependencies": {"eslint": ">=v6.6.0"},
+	"publishConfig": {"access": "public"}
 }
