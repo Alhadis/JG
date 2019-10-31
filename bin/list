@@ -97,6 +97,6 @@ async function ls(path){
 			fs.lstat(file, (error, stats) => error
 				? reject(error)
 				: resolve([file, stats]));
-		}))
+		})),
 	)]);
 }
