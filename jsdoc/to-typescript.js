@@ -80,7 +80,7 @@ function parseTypedef(obj, decl = true){
 	const isObject = /^Object(?:$|[.<])/i;
 	const hasProps = obj.properties && obj.properties.length;
 	if(!obj.type)
-		console.warn(obj);
+		throw new TypeError(`Doclet for "${obj.name}" lacks type information`);
 	if(hasProps && obj.type.names.some(n => isObject.test(n))){
 		obj.type.names = obj.type.names.filter(n => !isObject.test(n));
 		const props = obj.properties.map(parseProp).join(" ");
