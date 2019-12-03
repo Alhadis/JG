@@ -69,7 +69,10 @@ if(!argv.length){
 		].join("\n").trim() + "\n");
 	}
 	process.exit(exitStatus);
-})();
+})().catch(error => {
+	console.error(error);
+	process.exit(1);
+});
 
 function showUsage(){
 	process.stderr.write("Usage: jg typewrite [-s] [-d declare] [-e exclude] [-f footer] [-h header] ...files\n");
