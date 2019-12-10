@@ -1,9 +1,7 @@
-"use strict";
-
 const matchProp = /((?:^|\n)(?:\/\*\*)?\s*\*\s*)@prop(?:erty)?(?:\s+({.+?}))(?:\s+([^*\s]+))(?=\s*(?:$|\*\/))/gm;
 const matchOwner = /^\s*\*\s*@(class|typedef|const(?:ant)?|namespace|member(?:of)?)(?:\s+([^\n]+))\s*$/;
 
-module.exports.handlers = {
+export const handlers = {
 	jsdocCommentFound(event){
 		event.comment = event.comment
 			.replace(/\/\*\*((?:[^*]|\*[^/])+)\*\//g, (input, body) => {

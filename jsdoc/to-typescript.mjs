@@ -1,21 +1,9 @@
-"use strict";
+import {exec}          from "alhadis.utils";
+import {readFileSync}  from "fs";
+import {dirname, join} from "path";
+import {fileURLToPath} from "url";
 
-const {join} = require("path");
-const {exec} = require("alhadis.utils");
-const {readFileSync} = require("fs");
-
-module.exports = {
-	extractTypes,
-	loadFile,
-	parseFunction,
-	parseParam,
-	parseProp,
-	parseReturnType,
-	parseType,
-	parseTypedef,
-};
-
-async function extractTypes(inputFile){
+export async function extractTypes(inputFile){
 	const {doclets} = await loadFile(inputFile);
 	const types = [];
 	for(const doc of doclets){
@@ -58,8 +46,9 @@ async function extractTypes(inputFile){
 	return types;
 }
 
-async function loadFile(path){
-	const result = await exec("jsdoc", ["-c", join(__dirname, "config.json"), "-X", path]);
+export async function loadFile(path){
+	const dir = dirname(fileURLToPath(import.meta.url));
+	const result = await exec("jsdoc", ["-c", join(dir, "config.json"), "-X", path]);
 	const source = readFileSync(path, "utf8");
 	const doclets = JSON.parse(result.stdout)
 		.filter(doc => !doc.undocumented && "package" !== doc.kind)
@@ -76,11 +65,13 @@ async function loadFile(path){
 	return {doclets, source};
 }
 
-function parseTypedef(obj, decl = true){
+export function parseTypedef(obj, decl = true){
 	const isObject = /^Object(?:$|[.<])/i;
 	const hasProps = obj.properties && obj.properties.length;
-	if(!obj.type)
-		throw new TypeError(`Doclet for "${obj.name}" lacks type information`);
+	if(!obj.type){
+		if(obj.returns) obj.type = "Function";
+		else throw new TypeError(`Doclet for "${obj.name}" lacks type information`);
+	}
 	if(hasProps && obj.type.names.some(n => isObject.test(n))){
 		obj.type.names = obj.type.names.filter(n => !isObject.test(n));
 		const props = obj.properties.map(parseProp).join(" ");
@@ -99,7 +90,7 @@ function parseTypedef(obj, decl = true){
 		: `${obj.name}: ${type};`;
 }
 
-function parseProp(obj){
+export function parseProp(obj){
 	return (obj.readonly ? "readonly " : "")
 		+ obj.name
 		+ (obj.optional ? "?" : "")
@@ -107,9 +98,9 @@ function parseProp(obj){
 		+ ";";
 }
 
-function parseFunction(obj, sep = ": "){
+export function parseFunction(obj, sep = ": "){
 	const nested = {};
-	const params = obj.params.map(arg => {
+	const params = (obj.params || []).map(arg => {
 		if(/^([^.]+)\.(.+)/.test(arg.name)){
 			(nested[RegExp.$1] = nested[RegExp.$1] || []).push(arg);
 			arg.name = RegExp.$2;
@@ -120,7 +111,7 @@ function parseFunction(obj, sep = ": "){
 	return `(${params.join(", ")})${sep + parseReturnType(obj)}`;
 }
 
-function parseParam(obj, props = null){
+export function parseParam(obj, props = null){
 	let result = obj.variable
 		? ("..." + obj.name)
 		: obj.name + (obj.optional ? "?" : "");
@@ -130,7 +121,7 @@ function parseParam(obj, props = null){
 	return result;
 }
 
-function parseReturnType(obj){
+export function parseReturnType(obj){
 	if(!obj || !obj.returns)
 		return (obj && obj.async) ? "Promise<void>" : "void";
 	const names = new Set();
@@ -142,7 +133,7 @@ function parseReturnType(obj){
 	return type;
 }
 
-function parseType(obj, variadic = false){
+export function parseType(obj, variadic = false){
 	if("string" === typeof obj)
 		return parseType({names: [obj]}, variadic);
 	const primitives = /(?<!\$)\b(?:Boolean|Number|String|Object|Symbol|Null|Undefined)(?!\$)\b/gi;

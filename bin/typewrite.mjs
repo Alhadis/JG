@@ -1,10 +1,9 @@
 #!/usr/bin/env node
-"use strict";
 
-const fs        = require("fs");
-const {resolve} = require("path");
-const {which}   = require("alhadis.utils");
-const getOpts   = require("get-options");
+import fs        from "fs";
+import {resolve} from "path";
+import {which}   from "alhadis.utils";
+import getOpts   from "get-options";
 const {options, argv} = getOpts(process.argv.slice(2), {
 	"-d, --declare": "[type] [name] [body]",
 	"-e, --exclude": "[regexp]",
@@ -43,7 +42,7 @@ if(!argv.length){
 		process.stderr.write("typewrite: Required program not found in $PATH: jsdoc\n");
 		process.exit(2);
 	}
-	const {extractTypes} = require("../jsdoc/to-typescript.js");
+	const {extractTypes} = await import("../jsdoc/to-typescript.mjs");
 	
 	let exitStatus = 0;
 	while(argv.length){

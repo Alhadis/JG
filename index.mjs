@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-"use strict";
 
-const getOpts = require("get-options");
-const {join}  = require("path");
-const {readdirSync} = require("fs");
+import getOpts from "get-options";
+import {dirname, join} from "path";
+import {fileURLToPath} from "url";
+import {readFileSync, readdirSync} from "fs";
 
 let {options, argv} = getOpts(process.argv.slice(2), {
 	"-v, --version": "",
@@ -16,7 +16,7 @@ let {options, argv} = getOpts(process.argv.slice(2), {
 
 // Show installed version, then terminate
 if(options.version){
-	const {version} = require("./package.json");
+	const {version} = JSON.parse(readFileSync("./package.json", "utf8"));
 	process.stdout.write(version + "\n");
 	process.exit(0);
 }
@@ -62,8 +62,8 @@ if(!argv.length){
 if("ls" === argv[0]) argv[0] = "list";
 
 // Specified command doesn't exist in `./bin` subdirectory
-let path = join(__dirname, "bin");
-const subcmd = argv.shift();
+let path = join(dirname(fileURLToPath(import.meta.url)), "bin");
+const subcmd = argv.shift().replace(/(?:\.m?js)?$/i, ".mjs");
 if(!readdirSync(path).includes(subcmd)){
 	process.stderr.write(`fatal: unrecognised subcommand: "${subcmd}"\n`);
 	process.exit(1);
@@ -71,8 +71,11 @@ if(!readdirSync(path).includes(subcmd)){
 
 path = join(path, subcmd);
 process.argv = [process.execPath, path, ...argv];
-global.$0 = path;
-require(path);
+globalThis.$0 = path;
+import(path).catch(e => {
+	console.error(e);
+	process.exit(1);
+});
 
 
 function showUsage(){

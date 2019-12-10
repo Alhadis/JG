@@ -4,6 +4,7 @@
 	"description": "Shareable version of my ESLint config.",
 	"repository": "https://github.com/Alhadis/JG/tree/master/eslint",
 	"license": "ISC",
+	"type": "commonjs",
 	"keywords": ["eslint", "eslintconfig"],
 	"scripts": {"test": "eslint ."},
 	"peerDependencies": {"eslint": ">=v6.6.0"},

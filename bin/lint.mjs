@@ -1,29 +1,21 @@
 #!/usr/bin/env node
-"use strict";
 
-const fs = require("fs");
-const {resolve} = require("path");
-const {spawn} = require("child_process");
-const {findBasePath, which, smartSplit} = require("alhadis.utils");
-const {findFiles} = require("./list");
-const getPath = require("./path");
+import fs              from "fs";
+import {spawn}         from "child_process";
+import {resolve}       from "path";
+import {fileURLToPath} from "url";
+import {findFiles}     from "./list.mjs";
+import getPath         from "./path.mjs";
+import getOpts         from "get-options";
+import {findBasePath, which, smartSplit} from "alhadis.utils";
 
 const JS_EXT = /\.(?:mjs|jsx?)$/i;
 const TS_EXT = /\.tsx?$/i;
 const CS_EXT = /\.(?:cson|coffee)$/i;
 
-module.exports = {
-	lint,
-	run,
-	lintJavaScript,
-	lintTypeScript,
-	lintCoffeeScript,
-	resolveFileList,
-};
-
 // Run linters if loading file directly
-if(require.main === module || global.$0 === __filename){
-	const getOpts = require("get-options");
+const path = fileURLToPath(import.meta.url);
+if(process.argv[1] === path || globalThis.$0 === path){
 	const {options, argv} = getOpts(process.argv.slice(2), {
 		"-j, --js": "",
 		"-t, --ts": "",
@@ -37,7 +29,7 @@ if(require.main === module || global.$0 === __filename){
 }
 
 
-async function lint(paths, options = {}){
+export async function lint(paths, options = {}){
 	options = {...options}; // Avoid modifying by reference
 	paths = paths.filter(Boolean);
 	
@@ -121,7 +113,7 @@ async function lint(paths, options = {}){
  * @return {Number} Resolves with the command's exit code.
  * @internal
  */
-async function run(cmd, args, options = {}){
+export async function run(cmd, args, options = {}){
 	const {stdio = "inherit"} = options;
 	options.noEcho || process.stderr.write(`${cmd} ${args.join(" ")}\n`);
 	const proc = spawn(cmd, args, {windowsHide: true, stdio});
@@ -141,14 +133,14 @@ async function run(cmd, args, options = {}){
  * @return {Number} Exit code returned by ESLint
  * @internal
  */
-async function lintJavaScript(files, options){
+export async function lintJavaScript(files, options){
 	const args = ["--ext", "mjs,js", "--", ...resolveFileList(files, /\.(?:mjs|jsx?)$/i)];
 	let linked = false;
 	
 	// Stubborn hack to force ESLint v6+ to work when run globally
 	if(!fs.existsSync("node_modules")){
 		linked = resolve("node_modules");
-		const source = resolve(__dirname, "..", "node_modules");
+		const source = resolve(path, "..", "..", "node_modules");
 		+process.env.DEBUG && console.log(`Linking: ${source} -> ${linked}`);
 		fs.symlinkSync(source, linked);
 	}
@@ -191,7 +183,7 @@ async function lintJavaScript(files, options){
  * @return {Number} Exit code reported by TSLint
  * @internal
  */
-async function lintTypeScript(files, options){
+export async function lintTypeScript(files, options){
 	const configFile = getPath("tslint.json");
 	const args = ["-c", configFile, ...files];
 	return run("tslint", args, options);
@@ -210,7 +202,7 @@ async function lintTypeScript(files, options){
  * @return {Number} Exit code reported by CoffeeLint
  * @internal
  */
-async function lintCoffeeScript(files, options){
+export async function lintCoffeeScript(files, options){
 	const configFile = getPath("coffeelint.json");
 	const args = ["-q", "--ext", "cson", "-f", configFile, ...files];
 	return run("coffeelint", args, options);
@@ -228,7 +220,7 @@ async function lintCoffeeScript(files, options){
  * @param {RegExp} extMatch
  * @internal
  */
-function resolveFileList(paths, extMatch){
+export function resolveFileList(paths, extMatch){
 	const noExt = [];
 	const hasExt = [];
 	for(const path of paths)

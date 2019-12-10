@@ -1,13 +1,14 @@
 #!/usr/bin/env node
-"use strict";
 
-const {existsSync} = require("fs");
-const {join, resolve} = require("path");
-const ROOT_DIR = join(__dirname, "..");
-module.exports = getPath;
+import {existsSync}    from "fs";
+import {join, resolve} from "path";
+import {fileURLToPath} from "url";
+
+const path     = fileURLToPath(import.meta.url);
+const ROOT_DIR = join(path, "..", "..");
 
 // Allow use from command-line
-if(require.main === module || global.$0 === __filename){
+if(process.argv[1] === path || globalThis.$0 === path){
 	const args = process.argv.slice(2);
 	args.length || args.push("");
 	let paths = args.map(arg => getPath(arg));
@@ -35,7 +36,7 @@ if(require.main === module || global.$0 === __filename){
  * @return {String|null} An absolute path if the file exists; otherwise, null.
  * @public
  */
-function getPath(filename){
+export default function getPath(filename){
 	
 	// Shorthand: ESLint
 	let match = filename.match(/^\.?eslint(?:rc|[-/]?config)?(\/atom\/?)?(?:\.json)?$/i);

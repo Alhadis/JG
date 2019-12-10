@@ -3,8 +3,9 @@
 	"version": "v0.0.0",
 	"description": "Angry bastard's toolkit.",
 	"license": "ISC",
-	"bin": {"jg": "index.js"},
-	"engines": {"node": ">=12.4.0"},
+	"type": "module",
+	"bin": {"jg": "index.mjs"},
+	"engines": {"node": ">=13.2.0"},
 	"dependencies": {
 		"alhadis.utils": "latest",
 		"babel-eslint": "^10.0.3",

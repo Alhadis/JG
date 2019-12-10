@@ -1,16 +1,6 @@
 #!/usr/bin/env node
-"use strict";
 
-const {readFileSync} = require("fs");
-module.exports = {
-	dedupeMappings,
-	loadFile,
-	loadSegments,
-	parseMappings,
-	unifyMappings,
-	vlqDecode,
-	vlqEncode,
-};
+import {readFileSync} from "fs";
 
 let input = JSON.parse(readFileSync(process.argv.slice(2)[0], "utf8"));
 input = parseMappings(input);
@@ -25,7 +15,7 @@ console.log(input);
  * @return {Object[]}
  * @internal
  */
-function dedupeMappings(list){
+export function dedupeMappings(list){
 	const inputs  = Object.create(null);
 	const outputs = Object.create(null);
 	list = list.map(x => ({...x})); // Don't mutate input
@@ -51,7 +41,7 @@ function dedupeMappings(list){
  * @return {{path: String, lines: String[]}}
  * @internal
  */
-function loadFile(path){
+export function loadFile(path){
 	const cache = loadFile.cache = loadFile.cache || new Map();
 	if(cache.has(path))
 		return cache.get(path);
@@ -82,7 +72,7 @@ function loadFile(path){
  * @return {Object[]}
  * @internal
  */
-function loadSegments(list){
+export function loadSegments(list){
 	const loaded = new WeakSet();
 	let prevInput, prevOutput;
 	for(const mapping of list){
@@ -124,7 +114,7 @@ function loadSegments(list){
  * @return {Object[]}
  * @internal
  */
-function parseMappings(map){
+export function parseMappings(map){
 	const mappings = [];
 	let inputLine, inputColumn, inputFile, outputLine = 0, outputColumn;
 	for(const mapping of map.mappings.split(";")){
@@ -158,7 +148,7 @@ function parseMappings(map){
  * @return {Object[]}
  * @internal
  */
-function unifyMappings(list){
+export function unifyMappings(list){
 	const unified = new Map();
 	for(const mapping of list){
 		const {input, output} = mapping;
@@ -188,7 +178,7 @@ function unifyMappings(list){
  * @param {String} input
  * @return {Number[]}
  */
-function vlqDecode(input){
+export function vlqDecode(input){
 	const codex = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 	const values = [];
 	const {length} = input;
@@ -219,7 +209,7 @@ function vlqDecode(input){
  * @param {Number} input
  * @return {String}
  */
-function vlqEncode(input){
+export function vlqEncode(input){
 	const codex = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 	let encoded = "";
 	input = input < 0 ? (-input << 1) | 1 : (input << 1);

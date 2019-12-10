@@ -5,18 +5,17 @@
  * Used for serving files over a local network, chiefly
  * for viewing on mobile devices.
  */
-"use strict";
 
-const HTTP    = require("http");
-const fs      = require("fs");
-const path    = require("path");
-const getOpts = require("get-options");
-const {
+import HTTP    from "http";
+import fs      from "fs";
+import path    from "path";
+import getOpts from "get-options";
+import {
 	escapeHTML,
 	formatBytes,
 	timeSince,
-	deindent:HTML,
-} = require("alhadis.utils");
+	deindent as HTML,
+} from "alhadis.utils";
 
 
 // Resolve CLI switches
@@ -131,6 +130,7 @@ function getContentType(filePath){
 	const types = {
 		apng:  "image/png",
 		appcache: "text/cache-manifest",
+		cjs:   "text/javascript",
 		css:   "text/css",
 		eot:   "application/vnd.ms-fontobject",
 		flac:  "audio/flac",

@@ -1,18 +1,14 @@
 #!/usr/bin/env node
-"use strict";
 
-const {join, resolve} = require("path");
-const {escapeRegExp} = require("alhadis.utils");
-const fs = require("fs");
-
-module.exports = {
-	findFiles,
-	ls,
-};
+import {join, resolve} from "path";
+import {fileURLToPath} from "url";
+import {escapeRegExp} from "alhadis.utils";
+import getOpts from "get-options";
+import fs from "fs";
 
 // Allow command-line use if needed
-if(require.main === module || global.$0 === __filename){
-	const getOpts = require("get-options");
+const path = fileURLToPath(import.meta.url);
+if(process.argv[1] === path || globalThis.$0 === path){
 	const {options, argv} = getOpts(process.argv.slice(2), {
 		"-e, --extensions": "[list]",
 		"-i, --ignore": "[pattern]",
@@ -69,7 +65,7 @@ if(require.main === module || global.$0 === __filename){
 		});
 }
 
-async function findFiles(path, ignorePattern = /(?:^|[\\/])(?:\.git|node_modules)$/i){
+export async function findFiles(path, ignorePattern = /(?:^|[\\/])(?:\.git|node_modules)$/i){
 	path = resolve(path || process.cwd());
 	const files = await ls(path);
 	const searches = [];
@@ -85,7 +81,7 @@ async function findFiles(path, ignorePattern = /(?:^|[\\/])(?:\.git|node_modules
 	return files;
 }
 
-async function ls(path){
+export async function ls(path){
 	const files = await new Promise((resolve, reject) => {
 		fs.readdir(path, (error, list) => error
 			? reject(error)
