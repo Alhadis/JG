@@ -136,9 +136,12 @@ export async function run(cmd, args, options = {}){
 export async function lintJavaScript(files, options){
 	const args = ["--ext", "mjs,js", "--", ...resolveFileList(files, /\.(?:mjs|jsx?)$/i)];
 	let linked = false;
+	let stats = null;
 	
 	// Stubborn hack to force ESLint v6+ to work when run globally
 	if(!fs.existsSync("node_modules")){
+		const cwd = process.cwd();
+		stats = Object.assign(fs.statSync(cwd), {path: cwd});
 		linked = resolve("node_modules");
 		const source = resolve(path, "..", "..", "node_modules");
 		+process.env.DEBUG && console.log(`Linking: ${source} -> ${linked}`);
@@ -169,6 +172,7 @@ export async function lintJavaScript(files, options){
 	if(linked){
 		+process.env.DEBUG && console.log(`Unlinking: ${linked}`);
 		fs.unlinkSync(linked);
+		fs.utimesSync(stats.path, stats.atime, stats.mtime);
 	}
 	return code;
 }
