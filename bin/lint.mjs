@@ -4,10 +4,9 @@ import fs              from "fs";
 import {spawn}         from "child_process";
 import {resolve}       from "path";
 import {fileURLToPath} from "url";
-import {findFiles}     from "./list.mjs";
 import getPath         from "./path.mjs";
 import getOpts         from "get-options";
-import {findBasePath, which, smartSplit} from "alhadis.utils";
+import {findBasePath, ls, which, splitStrings} from "alhadis.utils";
 
 const JS_EXT = /\.(?:mjs|jsx?)$/i;
 const TS_EXT = /\.tsx?$/i;
@@ -42,7 +41,10 @@ export async function lint(paths, options = {}){
 		console.log("Linting with options", options);
 	
 	const files = new Map();
-	const maps = await Promise.all(paths.map(path => findFiles(resolve(path))));
+	const maps = await Promise.all(paths.map(path => ls(resolve(path), {
+		ignore: /(?:^|[\\/])(?:\.git|node_modules)$/i,
+		recurse: -1,
+	})));
 	for(const map of maps)
 		for(const [key, value] of map)
 			files.set(key, value);
@@ -164,7 +166,7 @@ export async function lintJavaScript(files, options){
 	
 	// Lastly, allow arbitrary options to be passed directly to ESLint
 	if(options.eslintOptions){
-		const extraOpts = smartSplit(options.eslintOptions);
+		const extraOpts = splitStrings(options.eslintOptions);
 		+process.env.DEBUG && console.log(`Prepending options: ${extraOpts}`);
 		args.unshift(...extraOpts);
 	}
