@@ -76,6 +76,7 @@
 			"error",
 			"tab",
 			{
+				"flatTernaryExpressions": true,
 				"ignoreComments": true,
 				"VariableDeclarator": 0,
 				"SwitchCase": 1,
