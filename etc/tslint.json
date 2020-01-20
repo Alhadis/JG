@@ -15,7 +15,7 @@
 		"file-name-casing": [true, "kebab-case"],
 		"import-spacing": true,
 		"indent": [true, "tabs", 4],
-		"interface-name": [true, "always-prefix"],
+		"interface-name": [true, "never-prefix"],
 		"jsdoc-format": [true, "check-multiline-start"],
 		"linebreak-style": [true, "LF"],
 		"new-parens": true,
