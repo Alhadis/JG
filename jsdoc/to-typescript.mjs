@@ -20,7 +20,7 @@ export async function extractTypes(inputFile){
 	const {doclets} = await loadFile(inputFile);
 	const types = [];
 	for(const doc of doclets){
-		if(doc.isEnum)
+		if(doc.isEnum && (doc.properties || []).length)
 			types.unshift({
 				body: `export declare enum ${doc.name} {${parseEnum(doc)}}`,
 				name: doc.name,
@@ -154,28 +154,117 @@ export function parseEnum(obj){
  * @return {String}
  */
 export function parseTypedef(obj, decl = true){
-	const isObject = /^Object(?:$|[.<])/i;
 	const hasProps = obj.properties && obj.properties.length;
 	if(!obj.type){
 		if(obj.returns) obj.type = "Function";
 		else throw new TypeError(`Doclet for "${obj.name}" lacks type information`);
 	}
-	if(hasProps && obj.type.names.some(n => isObject.test(n))){
-		obj.type.names = obj.type.names.filter(n => !isObject.test(n));
-		const props = obj.properties.map(parseProp).join(" ");
-		const type = (obj.type.names.length ? parseType(obj.type) + " | " : "") + `{${props.replace(/;$/, "")}};`;
-		return decl
-			? `declare type ${obj.name} = ${type}`
-			: `${obj.name}: ${type}`;
+	
+	// “Complex” type with properties
+	if(hasProps){
+		const isPrimitive = /^(?:bigint|boolean|null|number|string|symbol|undefined)$/i;
+		const isObject = /^Object(?:$|[.<])/i;
+		
+		// Primitive-type, quacks like a tuple
+		if(isTuple(obj))
+			return parseTuple(obj, decl);
+		
+		// This shouldn't happen
+		let {names} = obj.type;
+		if(names.every(name => isPrimitive.test(name)))
+			throw new TypeError(`Primitive "${RegExp.lastMatch}" cannot have properties`);
+		
+		// Single-type, not a POJO
+		if(1 === names.length && !isObject.test(names[0])){
+			let type = parseType(obj.type);
+			type = "object" !== type ? ` extends ${type.replace(/^([$\w]+)\[\]$/, "Array<$1>")}` : "";
+			const props = obj.properties.map(parseProp).join(" ");
+			return `${decl ? "declare " : ""}interface ${obj.name}${type} {${props.replace(/;$/, "")}}`;
+		}
+		
+		// Mixed-types (with at least one POJO)
+		else if(names.some(name => isObject.test(name))){
+			names = names.filter(name => !isObject.test(name));
+			obj.type.names = names;
+			const props = obj.properties.map(parseProp).join(" ");
+			const type = (obj.type.names.length ? parseType(obj.type) + " | " : "") + `{${props.replace(/;$/, "")}};`;
+			return decl
+				? `declare type ${obj.name} = ${type}`
+				: `${obj.name}: ${type}`;
+		}
 	}
 	let type = parseType(obj.type);
-	if("number[]" === type && hasProps)
-		type = `[${new Array(obj.properties.length).fill("number").join(", ")}]`;
-	else if("Function" === type && obj.params)
+	if("Function" === type && obj.params)
 		type = parseFunction(obj, " => ");
 	return decl
 		? `declare type ${obj.name} = ${type};`
 		: `${obj.name}: ${type};`;
+}
+
+
+/**
+ * Parse a {@link @typedef|https://jsdoc.app/tags-typedef.html} tag that quacks like a
+ * {@link tuple|https://www.typescriptlang.org/docs/handbook/basic-types.html#tuple}.
+ *
+ * @see {@link isTuple}
+ * @example parseTuple(doclet) == "declare type Colour = [number, number, number];"
+ * @param {Object} obj
+ * @param {Boolean} [decl=true]
+ * @return {String}
+ */
+export function parseTuple(obj, decl = true){
+	const types = obj.properties.map(prop => {
+		prop = {...prop};
+		delete prop.nullable;
+		delete prop.optional;
+		return parseType(prop.type);
+	}).join(", ");
+	return decl
+		? `declare type ${obj.name} = [${types}];`
+		: `${obj.name}: ${types};`
+}
+
+
+/**
+ * HACK: Does a type-definition quack like a tuple?
+ *
+ * @example isTuple({
+ *    kind: "typedef",
+ *    name: "Colour",
+ *    type: {names: ["Array.<Number>"]},
+ *    properties: [
+ *       {name: "0", type: {names: ["Number"]}, description: "Red"},
+ *       {name: "1", type: {names: ["Number"]}, description: "Green"},
+ *       {name: "2", type: {names: ["Number"]}, description: "Blue"},
+ *    ],
+ * }) === true;
+ *
+ * @param {Object} obj
+ * @return {Boolean}
+ *
+ * @todo FIXME: Make this work with union-types:
+ * @typedef  {Number|String} Example
+ * @property {Number} [0]
+ * @property {String} [1]
+ */
+export function isTuple(obj){
+	if(!(obj && obj.type && obj.properties && obj.properties.length))
+		return false;
+	
+	// Does each property have a numeric name, ordered incrementally from 0?
+	const {length} = obj.properties;
+	for(let i = 0; i < length; ++i)
+		if(i !== +obj.properties[i].name)
+			return false;
+	
+	// Does each property's type match that of the declared @typedef?
+	const type = parseType(obj.type).replace(/\[\]$/, "");
+	for(let i = 0; i < length; ++i){
+		const propType = parseType(obj.properties[i].type);
+		if(type !== propType)
+			return false;
+	}
+	return true;
 }
 
 
@@ -190,7 +279,7 @@ export function parseTypedef(obj, decl = true){
 export function parseProp(obj){
 	return (obj.readonly ? "readonly " : "")
 		+ obj.name
-		+ (obj.optional ? "?" : "")
+		+ (obj.optional || obj.nullable ? "?" : "")
 		+ ": " + parseType(obj.type)
 		+ ";";
 }
@@ -289,7 +378,7 @@ export function parseReturnType(obj){
 export function parseType(obj, variadic = false){
 	if("string" === typeof obj)
 		return parseType({names: [obj]}, variadic);
-	const primitives = /(?<!\$)\b(?:Boolean|Number|String|Object|Symbol|Null|Undefined)(?!\$)\b/gi;
+	const primitives = /(?<!\$)\b(?:BigInt|Boolean|Number|String|Object|Symbol|Null|Undefined)(?!\$)\b/gi;
 	return obj.names.map(name => {
 		if(/^Array\.?<([^<>]+)>$/i.test(name))
 			name = RegExp.$1 + "[]";
