@@ -69,7 +69,7 @@
 		"prefer-template": [true, "allow-single-concat"],
 		"prefer-while": true,
 		"quotemark": [true, "double", "avoid-escape"],
-		"semicolon": [true, "always"],
+		"semicolon": [true, "always", "ignore-interfaces"],
 		"space-before-function-paren": [true, {
 			"anonymous": "always",
 			"asyncArrow": "always",
