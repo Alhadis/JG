@@ -49,6 +49,11 @@ export async function extractTypes(inputFile){
 export async function loadFile(path){
 	const dir = dirname(fileURLToPath(import.meta.url));
 	const result = await exec("jsdoc", ["-c", join(dir, "config.json"), "-X", path]);
+	
+	// Complain loudly if JSDoc reported an error
+	result.stderr && process.stderr.write(`jsdoc: ${result.stderr}`);
+	result.code   && process.exit(result.code);
+	
 	const source = readFileSync(path, "utf8");
 	const doclets = JSON.parse(result.stdout)
 		.filter(doc => !doc.undocumented && "package" !== doc.kind)
