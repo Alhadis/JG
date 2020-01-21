@@ -1,8 +1,8 @@
 {
 	"plugins": [
-		"./fix-props"
+		"./fix-props.cjs"
 	],
 	"source": {
-		"includePattern": "\\.+(mjs|js(on|x)?)$"
+		"includePattern": "\\.+([cm]js|js(on|x)?)$"
 	}
 }
