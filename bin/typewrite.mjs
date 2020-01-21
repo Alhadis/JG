@@ -55,8 +55,14 @@ if(!argv.length){
 		let types = new Map((await extractTypes(path))
 			.filter(type => !options.exclude.test(type))
 			.map(type => [type.name, type.body]));
-		for(const [type, name, body] of options.declare)
-			types.set(name, `export declare ${type} ${name}:${body}`);
+		for(let [type, name, body, extend] of options.declare){
+			[name, ...extend] = name.split(/\s+/);
+			types.set(name, `export declare ${type} ${name}`
+				+ (extend.length ? ` ${extend.join(" ")}` : "")
+				+ ({class: 1, enum: 1, interface: 1}[type]
+					? ` { ${body.replace(/^\s*{\s*|\s*}\s*$/g, "")} }`
+					: `:${body.replace(/[;\s]+$/, "")};`));
+		}
 		types = Array.from(types.values());
 		options.sort && types.sort();
 		
