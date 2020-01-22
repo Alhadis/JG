@@ -14,6 +14,7 @@ import {
 	escapeHTML,
 	formatBytes,
 	timeSince,
+	tildify,
 	deindent as HTML,
 } from "alhadis.utils";
 
@@ -26,7 +27,7 @@ const {options, argv} = getOpts(process.argv.slice(2), {
 }, {noMixedOrder: true, noUndefined: true, terminator: "--"});
 const cwd       = process.cwd();
 const port      = Math.max(+options.port, 0) || 1337;
-let root        = argv[0] || cwd;
+let root        = path.resolve(argv[0] || cwd);
 const noIndex   = !!options.noIndex;
 const printPost = !!options.printPost;
 
@@ -115,9 +116,27 @@ const server = HTTP.createServer(async (request, response) => {
 });
 
 server.listen(port);
-console.log(`Serving files from ${root} on port ${port}`);
+console.log(`[PID: ${process.pid}] Serving files from ${tildify(root)} on port ${port}`);
 noIndex   && console.log("--no-index passed: directory indexes will not be displayed");
 printPost && console.log("--print-post enabled: POST bodies will be echoed to stdout");
+
+process.stdin.setRawMode(true);
+process.stdin.on("data", data => (0x03 === data[0] || 0x04 === data[0]) && stop());
+process.on("beforeExit", () => process.stdin.setRawMode(false));
+process.on("SIGINT", stop);
+process.on("SIGTERM", stop);
+
+
+/**
+ * Stop the server and terminate process.
+ *
+ * @param {Number} [code=0]
+ * @return {void}
+ */
+function stop(code = 0){
+	process.stdin.setRawMode(false);
+	server.close(() => process.exit(code));
+}
 
 
 /**
