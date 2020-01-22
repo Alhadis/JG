@@ -11,6 +11,7 @@ import fs      from "fs";
 import path    from "path";
 import getOpts from "get-options";
 import {
+	escapeCtrl,
 	escapeHTML,
 	formatBytes,
 	timeSince,
@@ -55,10 +56,13 @@ else{
 
 // Initialise server
 const server = HTTP.createServer(async (request, response) => {
-	if(printPost && "POST" === request.method){
-		const data = await receive(request);
-		console.log(data);
-	}
+	if(printPost && "POST" === request.method)
+		console.log(escapeCtrl(await receive(request), {
+			before: "\x1B[7m",
+			after: "\x1B[27m",
+			named: true,
+			caret: true,
+		}));
 	
 	// Return an HTML wrapper for JS files loaded as root
 	if(wrapperPath && "/" === request.url.replace(/\?.*$/, "")){
@@ -121,21 +125,22 @@ noIndex   && console.log("--no-index passed: directory indexes will not be displ
 printPost && console.log("--print-post enabled: POST bodies will be echoed to stdout");
 
 process.stdin.setRawMode(true);
-process.stdin.on("data", data => (0x03 === data[0] || 0x04 === data[0]) && stop());
+process.stdin.on("data", data => (0x03 === data[0] || 0x04 === data[0]) && halt());
 process.on("beforeExit", () => process.stdin.setRawMode(false));
-process.on("SIGINT", stop);
-process.on("SIGTERM", stop);
+process.on("SIGINT", halt);
+process.on("SIGTERM", halt);
 
 
 /**
- * Stop the server and terminate process.
+ * Terminate process.
  *
- * @param {Number} [code=0]
+ * @param {Number} [code=0] - Exit status to terminate with
+ * @param {Boolean} [graceful=false] - Wait for server to shutdown(2) first
  * @return {void}
  */
-function stop(code = 0){
+function halt(code = 0, graceful = false){
 	process.stdin.setRawMode(false);
-	server.close(() => process.exit(code));
+	graceful ? server.close(() => process.exit(code)) : process.exit(code);
 }
 
 
