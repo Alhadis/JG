@@ -174,27 +174,35 @@ function halt(code = 0, graceful = false){
 /**
  * Derive a file's content-type from its file extension.
  *
- * @param {String} filePath
+ * @param {String} file
  * @return {String}
  */
-function getContentType(filePath){
-	const types = {
+function getContentType(file){
+	
+	// Preprocessing to minimise the size of the MIME-type maps below
+	if(/\.(?:[1-9](?![0-9])[a-z_0-9]*|0p|n|man|mdoc)(?:\.in)?$/i.test(file)
+	|| /(?:^|[./])(?:mandoc|me|mmn|mmt|ms|mom|nr|[ng]?roff?|t)$/i.test(file)
+	|| /(?:^|[./])(tmac|tmac-u|tr|(?:eqn|troff)(?:rc(?:-end)?)?)$/i.test(file))
+		file = "a.roff";
+	else file = file
+		.replace(/\.(?:sublime|json)(?=-tmlanguage$)/i, ".")
+		.replace(/\.(?:sublime-)?syntax$/i, ".yml");
+	
+	const binary = {
+		ai:    "application/pdf",
 		apng:  "image/png",
-		appcache: "text/cache-manifest",
-		cjs:   "text/javascript",
-		css:   "text/css",
+		bmp:   "image/bmp",
+		cat:   "application/octet-stream",
+		djvu:  "image/vnd.djvu",
+		djv:   "image/vnd.djvu",
 		eot:   "application/vnd.ms-fontobject",
 		flac:  "audio/flac",
 		gif:   "image/gif",
-		htm:   "text/html",
-		html:  "text/html",
 		ico:   "image/x-icon",
 		jpeg:  "image/jpeg",
 		jpg:   "image/jpeg",
-		js:    "text/javascript",
-		json:  "application/json",
-		map:   "application/json",
-		mjs:   "text/javascript",
+		mid:   "audio/midi",
+		midi:  "audio/midi",
 		mka:   "audio/x-matroska",
 		mkv:   "video/x-matroska",
 		mp3:   "audio/mpeg",
@@ -205,23 +213,60 @@ function getContentType(filePath){
 		otf:   "font/otf",
 		pdf:   "application/pdf",
 		png:   "image/png",
-		svg:   "image/svg+xml",
+		tiff:  "image/tiff",
+		tif:   "image/tiff",
+		ttc:   "font/collection",
 		ttf:   "font/ttf",
-		txt:   "text/plain",
-		vtt:   "text/vtt",
 		wasm:  "application/wasm",
 		wav:   "audio/x-wav",
-		webmanifest: "application/manifest+json",
 		webm:  "video/webm",
 		webp:  "image/webp",
 		woff:  "font/woff",
 		woff2: "font/woff2",
-		xml:   "text/xml",
+		xcf:   "image/x-xcf",
+	};
+	const text = {
+		appcache:    "text/cache-manifest",
+		chem:        "text/troff",
+		cjs:         "text/javascript",
+		css:         "text/css",
+		eps:         "application/postscript",
+		epsi:        "application/postscript",
+		htm:         "text/html",
+		html:        "text/html",
+		js:          "text/javascript",
+		json:        "application/json",
+		map:         "application/json",
+		markdown:    "text/markdown",
+		md:          "text/markdown",
+		mkd:         "text/markdown",
+		mjs:         "text/javascript",
+		pfa:         "application/postscript",
+		ps:          "application/postscript",
+		pic:         "text/troff",
+		plist:       "text/xml",
+		rtf:         "text/richtext",
+		roff:        "text/troff",
+		sgml:        "text/sgml",
+		sgm:         "text/sgml",
+		svg:         "image/svg+xml",
+		tmlanguage:  "text/xml",
+		tsv:         "text/tab-separated-values",
+		txt:         "text/plain",
+		vtt:         "text/vtt",
+		webmanifest: "application/manifest+json",
+		yaml:        "text/x-yaml",
+		yml:         "text/x-yaml",
+		xml:         "text/xml",
 	};
 	const defaultType = "text/plain";
-	return /\.([-\w]+)$/.test(filePath)
-		? types[RegExp.lastParen.toLowerCase()] || defaultType
-		: defaultType;
+	if(/\.([-\w]+)$/.test(file)){
+		const type = RegExp.lastParen.toLowerCase();
+		return binary[type]
+			? `${binary[type]}; charset=binary`
+			: `${text[type] || defaultType}; charset=UTF-8`;
+	}
+	return defaultType + "; charset=UTF-8";
 }
 
 
@@ -243,9 +288,11 @@ async function getFileForURL(input){
 		.replace(/\?.+$/, "");
 	
 	let file = path.join(root, input);
+	let mounted = false;
 	for(const [from, to] of mounts)
 		if(input === from || input.startsWith(from + "/")){
 			file = path.join(mounts.get(from), input.substring(from.length));
+			mounted = true;
 			break;
 		}
 	
@@ -259,9 +306,15 @@ async function getFileForURL(input){
 		return {file, stats};
 
 	if(stats.isSymbolicLink(file)){
-		const parent = path.dirname(file);
-		const realPath = fs.readlinkSync(file);
-		return getFileForURL(path.resolve(parent, realPath));
+		if(mounted){
+			file = fs.realpathSync(file);
+			return {file, stats: fs.lstatSync(file)};
+		}
+		else{
+			const parent = path.dirname(file);
+			const realPath = fs.readlinkSync(file);
+			return getFileForURL(path.resolve(parent, realPath));
+		}
 	}
 
 	if(stats.isDirectory(file)){
