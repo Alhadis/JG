@@ -23,14 +23,41 @@ import {
 // Resolve CLI switches
 const {options, argv} = getOpts(process.argv.slice(2), {
 	"-I, --no-index":   "",
+	"-m, --mount":      "[directory:mount-point]",
 	"-p, --port":       "[number=\\d+]",
 	"-P, --print-post": "",
-}, {noMixedOrder: true, noUndefined: true, terminator: "--"});
+}, {
+	duplicates: "stack",
+	noAliasPropagation: "first-only",
+	noMixedOrder: true,
+	noUndefined: true,
+	terminator: "--",
+});
 const cwd       = process.cwd();
 const port      = Math.max(+options.port, 0) || 1337;
 let root        = path.resolve(argv[0] || cwd);
 const noIndex   = !!options.noIndex;
 const printPost = !!options.printPost;
+
+
+// Configure mount-points
+let mounts = new Map();
+const mappings = "string" === typeof options.mount ? [options.mount] : options.mount;
+for(const mapping of mappings || []){
+	if(!mapping[0])
+		throw new TypeError("--mount option requires an argument");
+	let [to, ...from] = (Array.isArray(mapping) ? mapping : [mapping])[0].split(":");
+	to = path.resolve(to);
+	if(fs.existsSync(to)){
+		from = (from.join(":").replace(/^\/|\/$/g, "")) || path.basename(to);
+		console.log(`Mounted: ${tildify(to)} -> /${from}`);
+		mounts.set(from, to);
+	}
+	else throw new Error(`No such file or directory: ${to}`);
+}
+
+// Sort mount-points so that longer paths are matched first
+mounts = new Map([...mounts].sort(([{length: a}], [{length: b}]) => a > b ? -1 : a < b ? 1 : 0));
 
 
 // Allow standalone JS files to run in browsers
@@ -215,7 +242,13 @@ async function getFileForURL(input){
 		.replace(/^\/+/, "")
 		.replace(/\?.+$/, "");
 	
-	const file = path.join(root, input);
+	let file = path.join(root, input);
+	for(const [from, to] of mounts)
+		if(input === from || input.startsWith(from + "/")){
+			file = path.join(mounts.get(from), input.substring(from.length));
+			break;
+		}
+	
 	if(!fs.existsSync(file)){
 		console.log("No such file: " + file);
 		return {};
