@@ -54,8 +54,8 @@ export async function lint(paths, options = {}){
 			files.set(key, value);
 
 	// Stuff we can lint with different NPM linters
-	let js = [];
-	let ts = [];
+	let js       = [];
+	const ts     = [];
 	const coffee = [];
 
 	for(const [path, stats] of files){

@@ -289,7 +289,7 @@ async function getFileForURL(input){
 	
 	let file = path.join(root, input);
 	let mounted = false;
-	for(const [from, to] of mounts)
+	for(const [from] of mounts)
 		if(input === from || input.startsWith(from + "/")){
 			file = path.join(mounts.get(from), input.substring(from.length));
 			mounted = true;
@@ -484,6 +484,6 @@ async function makeIndex(dir){
 				`).join("")}</tbody>
 			</table>
 		</body>
-		</html>`
-	.replace(/(<time\s+datetime="([^"]+)")\s*>/gi, '$1 title="$2">');
+		</html>
+	`.replace(/(<time\s+datetime="([^"]+)")\s*>/gi, '$1 title="$2">');
 }

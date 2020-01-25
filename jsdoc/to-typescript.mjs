@@ -221,7 +221,7 @@ export function parseTuple(obj, decl = true){
 	}).join(", ");
 	return decl
 		? `declare type ${obj.name} = [${types}];`
-		: `${obj.name}: ${types};`
+		: `${obj.name}: ${types};`;
 }
 
 
