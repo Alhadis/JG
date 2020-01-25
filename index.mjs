@@ -12,6 +12,7 @@ let {options, argv} = getOpts(process.argv.slice(2), {
 	"-l, --list": "[exts=\\S+]",
 	"-p, --print-path": "",
 	"-i, --in-place-edit": "[pattern=\\S+]",
+	"-w, --where": "",
 }, {noMixedOrder: true, noUndefined: true, terminator: "--"});
 
 // Show installed version, then terminate
@@ -35,6 +36,7 @@ if("L" in options)
 // Switches which are aliases/shorthand of subcommands
 if(options.inPlaceEdit)    argv.unshift("edit", "-i");
 else if(options.printPath) argv.unshift("path");
+else if(options.where)     argv.unshift("where");
 
 // Process arguments of `jg -l` shorthand
 else if("list" in options){
