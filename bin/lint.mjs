@@ -8,9 +8,13 @@ import getPath         from "./path.mjs";
 import getOpts         from "get-options";
 import {findBasePath, ls, which, splitStrings} from "alhadis.utils";
 
-const JS_EXT = /\.(?:mjs|jsx?)$/i;
+const JS_EXT = /\.(?:[cm]js|jsx?)$/i;
 const TS_EXT = /\.tsx?$/i;
 const CS_EXT = /\.(?:cson|coffee)$/i;
+
+const JS_ENGINES = "chakra d8 gjs js node qjs rhino v8 v8-shell".split(" ");
+const TS_ENGINES = "deno tsc ts-node".split(" ");
+const CS_ENGINES = ["coffee"];
 
 // Run linters if loading file directly
 const path = fileURLToPath(import.meta.url);
@@ -74,11 +78,9 @@ export async function lint(paths, options = {}){
 				const interpreter = "env" === match[1]
 					? (match[2] || "").split("/").pop()
 					:  match[1];
-				switch(interpreter){
-					case "node":   options.js && js.push(path);     break;
-					case "tsc":    options.ts && ts.push(path);     break;
-					case "coffee": options.cs && coffee.push(path); break;
-				}
+				if(JS_ENGINES.includes(interpreter))      options.js && js.push(path);
+				else if(TS_ENGINES.includes(interpreter)) options.ts && ts.push(path);
+				else if(CS_ENGINES.includes(interpreter)) options.cs && coffee.push(path);
 			}
 		}
 	}
@@ -136,7 +138,7 @@ export async function run(cmd, args, options = {}){
  * @internal
  */
 export async function lintJavaScript(files, options){
-	const args = ["--ext", "mjs,js", "--", ...resolveFileList(files, /\.(?:mjs|jsx?)$/i)];
+	const args = ["--ext", "cjs,mjs,js", "--", ...resolveFileList(files, /\.(?:[cm]js|jsx?)$/i)];
 	let linked = false;
 	let stats = null;
 	
