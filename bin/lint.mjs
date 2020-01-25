@@ -12,7 +12,7 @@ const JS_EXT = /\.(?:[cm]js|jsx?)$/i;
 const TS_EXT = /\.tsx?$/i;
 const CS_EXT = /\.(?:cson|coffee)$/i;
 
-const JS_ENGINES = "chakra d8 gjs js node qjs rhino v8 v8-shell".split(" ");
+const JS_ENGINES = "chakra d8 gjs js mujs node qjs rhino slimerjs v8 v8-shell".split(" ");
 const TS_ENGINES = "deno tsc ts-node".split(" ");
 const CS_ENGINES = ["coffee"];
 
