@@ -479,10 +479,11 @@ async function makeIndex(dir){
 						<td title="${file.type.name}">${file.type.icon}</td>
 						<td><a href="${file.name}">${file.name}</a></td>
 						<td>${formatBytes(file.size)}</td>
-						<td>${timeSince(file.mtime)}</td>
+						<td><time datetime="${file.mtime.toISOString()}">${timeSince(file.mtime)}</time></td>
 					</tr>
 				`).join("")}</tbody>
 			</table>
 		</body>
-		</html>`;
+		</html>`
+	.replace(/(<time\s+datetime="([^"]+)")\s*>/gi, '$1 title="$2">');
 }
