@@ -34,7 +34,7 @@ if(process.argv[1] === path || globalThis.$0 === path){
 
 export async function lint(paths, options = {}){
 	options = {...options}; // Avoid modifying by reference
-	paths = paths.filter(Boolean);
+	paths = paths.filter(Boolean).map(path => resolve(path));
 	
 	// Enable everything if a specific language/linter wasn't given
 	if(!(options.js || options.ts || options.coffee))
@@ -45,7 +45,7 @@ export async function lint(paths, options = {}){
 		console.log("Linting with options", options);
 	
 	const files = new Map();
-	const maps = await Promise.all(paths.map(path => ls(resolve(path), {
+	const maps = await Promise.all(paths.map(path => ls(path, {
 		ignore: /(?:^|[\\/])(?:\.git|node_modules)$/i,
 		recurse: -1,
 	})));
@@ -54,8 +54,8 @@ export async function lint(paths, options = {}){
 			files.set(key, value);
 
 	// Stuff we can lint with different NPM linters
-	const js = [];
-	const ts = [];
+	let js = [];
+	let ts = [];
 	const coffee = [];
 
 	for(const [path, stats] of files){
@@ -99,6 +99,17 @@ export async function lint(paths, options = {}){
 		process.exit(1);
 	}
 	
+	// Avoid resolving base directories of individually-specified files
+	const isolate = [];
+	for(const path of paths){
+		const stats = files.get(path);
+		if(stats && !stats.isDirectory())
+			isolate.push(path);
+	}
+	
+	// Optimise file-list so we don't flood the terminal when echoing the command
+	js = resolveFileList(js, JS_EXT, isolate);
+	
 	let code = 0;
 	if(js.length)     (code = await lintJavaScript(js, options))       && process.exit(code);
 	if(ts.length)     (code = await lintTypeScript(ts, options))       && process.exit(code);
@@ -138,7 +149,7 @@ export async function run(cmd, args, options = {}){
  * @internal
  */
 export async function lintJavaScript(files, options){
-	const args = ["--ext", "cjs,mjs,js", "--", ...resolveFileList(files, /\.(?:[cm]js|jsx?)$/i)];
+	const args = ["--ext", "cjs,mjs,js", "--", ...files];
 	let linked = false;
 	let stats = null;
 	
@@ -185,7 +196,7 @@ export async function lintJavaScript(files, options){
 /**
  * Run `tslint` on the root directory enclosing each specified pathname.
  *
- * @example lintTypeScript("/foo/bar", "/foo/baz") => `tslint --project /foo`;
+ * @example lintTypeScript(["/foo/bar", "/foo/baz"]) => `tslint --project /foo`;
  * @param {String[]} files - Resolved pathnames
  * @param {Object} options - Options hash
  * @return {Number} Exit code reported by TSLint
@@ -224,19 +235,24 @@ export async function lintCoffeeScript(files, options){
  * are included as-is; it's assumed these are executables without
  * an extension that would be recognised by the respective linter.
  *
+ * Any paths listed in `isolate` are excluded for the purposes of
+ * determining a shared base directory.
+ *
  * @param {String[]} paths
  * @param {RegExp} extMatch
+ * @param {String[]} [isolate=[]]
+ * @return {String[]}
  * @internal
  */
-export function resolveFileList(paths, extMatch){
-	const noExt = [];
-	const hasExt = [];
-	for(const path of paths)
-		extMatch.test(path) ? hasExt.push(path) : noExt.push(path);
-	
+export function resolveFileList(paths, extMatch, isolate = []){
 	let list = [];
-	if(hasExt.length) list.push(findBasePath(hasExt));
-	if(noExt.length)  list.push(...noExt);
+	const resolve = [];
+	for(const path of paths)
+		isolate.includes(path) || !extMatch.test(path)
+			? list.push(path)
+			: resolve.push(path);
+	
+	resolve.length && list.push(findBasePath(resolve));
 	const cwd = process.cwd().replace(/([/\\^$*+?{}[\]().|])/g, "\\$1");
 	const cwdExpr = new RegExp(`^${cwd}/?`, "i");
 	
