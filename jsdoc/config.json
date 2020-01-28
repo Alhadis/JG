@@ -1,6 +1,7 @@
 {
 	"plugins": [
-		"./fix-props.cjs"
+		"./fix-props.cjs",
+		"./fix-typedefs.cjs"
 	],
 	"source": {
 		"includePattern": "\\.+([cm]js|js(on|x)?)$"

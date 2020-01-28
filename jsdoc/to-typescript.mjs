@@ -21,7 +21,15 @@ export async function extractTypes(inputFile){
 	const types = [];
 	for(const doc of doclets){
 		if(doc.isEnum && (doc.properties || []).length)
-			types.unshift({
+			// Treat as a union-type of literals if @flatten is present
+			if(hasTag(doc, "flatten"))
+				types.unshift({
+					body: `declare type ${doc.name} = ${parseEnum(doc, true)};`,
+					name: doc.name,
+					type: "typedef",
+					doclet: doc,
+				});
+			else types.unshift({
 				body: `export declare enum ${doc.name} {${parseEnum(doc)}}`,
 				name: doc.name,
 				type: "enum",
@@ -102,6 +110,18 @@ export async function loadFile(path, ignoreErrors = false){
 
 
 /**
+ * Determine if a doclet contains a custom tag of the given name.
+ *
+ * @param {Object} doclet
+ * @param {String} name
+ * @return {Boolean}
+ */
+export function hasTag(doclet, name){
+	return doclet.tags && doclet.tags.some(tag => name === tag.title);
+}
+
+
+/**
  * Parse an {@link @enum|https://jsdoc.app/tags-enum.html} tag and
  * return the equivalent TypeScript syntax. Note that computed values
  * (such as object expressions) may yield invalid results.
@@ -118,9 +138,10 @@ export async function loadFile(path, ignoreErrors = false){
  * }) == "ON = 1, OFF = 0";
  *
  * @param {Object} obj
+ * @param {Boolean} [flatten=false]
  * @return {String}
  */
-export function parseEnum(obj){
+export function parseEnum(obj, flatten = false){
 	const props = [];
 	for(const prop of obj.properties){
 		const {name, defaultvalue, meta} = prop;
@@ -128,9 +149,9 @@ export function parseEnum(obj){
 			throw new TypeError(`Missing value for ${name} in enum ${obj.name}`);
 		const isStr = "string" === typeof defaultvalue && "Literal" === meta.code.type;
 		const value = isStr ? '"' + defaultvalue + '"' : defaultvalue;
-		props.push(`${name} = ${value}`);
+		props.push(flatten ? value : `${name} = ${value}`);
 	}
-	return props.join(", ");
+	return props.join(flatten ? " | " : ", ");
 }
 
 
