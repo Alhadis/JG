@@ -11,7 +11,7 @@ let {options, argv} = getOpts(process.argv.slice(2), {
 	"-L": "[exts=\\S+]",
 	"-l, --list": "[exts=\\S+]",
 	"-p, --print-path": "",
-	"-i, --in-place-edit": "[pattern=\\S+]",
+	"-i, --in-place-edit": "",
 	"-w, --where": "",
 }, {noMixedOrder: true, noUndefined: true, terminator: "--"});
 
@@ -85,6 +85,8 @@ function showUsage(){
 		"Usage: jg subcommand [...args]",
 		"       jg [-l|--list] ...exts",
 		"       jg [-i|--in-place-edit regexp] [...files]",
+		"       jg [-p|--print-path] file",
+		"       jg [-w|--where] ...npm-modules",
 		"       jg [-h|--help]",
 		"       jg [-v|--version]",
 	].join("\n") + "\n");
