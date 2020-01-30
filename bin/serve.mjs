@@ -26,6 +26,7 @@ const {options, argv} = getOpts(process.argv.slice(2), {
 	"-m, --mount":      "[directory:mount-point]",
 	"-p, --port":       "[number=\\d+]",
 	"-P, --print-post": "",
+	"-t, --trace":      "",
 }, {
 	duplicates: "stack",
 	noAliasPropagation: "first-only",
@@ -38,6 +39,7 @@ const port      = Math.max(+options.port, 0) || 1337;
 let root        = path.resolve(argv[0] || cwd);
 const noIndex   = !!options.noIndex;
 const printPost = !!options.printPost;
+const trace     = !!options.trace;
 
 
 // Configure mount-points
@@ -83,13 +85,24 @@ else{
 
 // Initialise server
 const server = HTTP.createServer(async (request, response) => {
+	const escape = input => escapeCtrl(input, {
+		before: "\x1B[7m",
+		after: "\x1B[27m",
+		named: true,
+		caret: true,
+	});
+	
+	// Trace incoming requests to standard output
+	if(trace){
+		const {method, rawHeaders, httpVersion, url} = request;
+		console.log(escape(`${method} ${url} HTTP/${httpVersion}`));
+		for(let i = 0; i < rawHeaders.length; i += 2)
+			console.log(escape(rawHeaders.slice(i, i + 2).join(": ")));
+		console.log("");
+	}
+	
 	if(printPost && "POST" === request.method)
-		console.log(escapeCtrl(await receive(request), {
-			before: "\x1B[7m",
-			after: "\x1B[27m",
-			named: true,
-			caret: true,
-		}));
+		console.log(escape(await receive(request)));
 	
 	// Return an HTML wrapper for JS files loaded as root
 	if(wrapperPath && "/" === request.url.replace(/\?.*$/, "")){
@@ -150,6 +163,7 @@ server.listen(port);
 console.log(`[PID: ${process.pid}] Serving files from ${tildify(root)} on port ${port}`);
 noIndex   && console.log("--no-index passed: directory indexes will not be displayed");
 printPost && console.log("--print-post enabled: POST bodies will be echoed to stdout");
+trace     && console.log("--trace enabled: incoming requests will be echoed to stdout");
 
 process.stdin.setRawMode(true);
 process.stdin.on("data", data => (0x03 === data[0] || 0x04 === data[0]) && halt());
