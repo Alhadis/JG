@@ -2,7 +2,7 @@
 
 import getOpts from "get-options";
 import {dirname, join} from "path";
-import {fileURLToPath} from "url";
+import {fileURLToPath, pathToFileURL} from "url";
 import {readFileSync, readdirSync} from "fs";
 
 let {options, argv} = getOpts(process.argv.slice(2), {
@@ -74,7 +74,7 @@ if(!readdirSync(path).includes(subcmd)){
 path = join(path, subcmd);
 process.argv = [process.execPath, path, ...argv];
 globalThis.$0 = path;
-import(path).catch(e => {
+import(pathToFileURL(path)).catch(e => {
 	console.error(e);
 	process.exit(1);
 });
