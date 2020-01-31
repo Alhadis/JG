@@ -6,12 +6,12 @@
  * {@link http://karma-runner.github.io/|Karma} launchers.
  */
 
-import {dirname, join, resolve} from "path";
+import {basename, dirname, join, resolve} from "path";
 import {existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync} from "fs";
 import {exec, which} from "alhadis.utils";
 import {spawn} from "child_process";
 import {fileURLToPath} from "url";
-import {tmpdir} from "os";
+import {tmpdir, EOL} from "os";
 import getOpts from "get-options";
 
 
@@ -364,8 +364,16 @@ export async function getVersion(path){
 			const {stdout} = await exec("powershell.exe", ["-command", cmd]);
 			return stdout.trim().split(/\r?\n/).filter(Boolean)[0];
 		}
+		
+		default:
+			const name = basename(path).replace(/(?<=\S)\.\w+$/, "").toLowerCase();
+			return ("firefox" === name
+				? ((await exec(path, ["--version"])).stdout).replace(/^(?:Mozilla|Firefox|\s*)*/i, "").trim()
+				: /^(?:google-)?chrome(?:-(?:canary|stable|unstable))?$|^chromium$/.test(name)
+					? ((await exec(path, ["--version"]).stdout).match(/[\d.]+/) || [])[0]
+					:  (await exec(path, ["--version"])).stdout.trim())
+				|| null;
 	}
-	return null;
 }
 
 
@@ -513,7 +521,58 @@ export async function openOpera(url){
 	const path = await findOpera();
 	if(!path) throw new Error("Could not locate Opera on host system");
 	const profile = join(tmpdir(), "jg-browse-opera");
-	const flags = [
+	const release = (await getVersion(path)).split(".").map(Number)[0];
+	existsSync(profile) || mkdirSync(profile);
+	let flags;
+	
+	// Presto (pre-Chromium) Opera
+	if(release < 13){
+		// NB: NFI which INI file's really needed
+		const ini1 = join(profile, "opera6.ini");
+		const ini2 = join(profile, "operaprefs.ini");
+		flags = ["-pd", profile, ..."win32" === process.platform
+			? ["/Settings", ini1]
+			: ["-nomail"]];
+		const prefs = `
+			Opera Preferences version 2.1
+
+			[User Prefs]
+			Show Default Browser Dialog = 0
+			Startup Type = 2
+			Home URL = about:blank
+			Show Close All But Active Dialog = 0
+			Show Close All Dialog = 0
+			Show Crash Log Upload Dialog = 0
+			Show Delete Mail Dialog = 0
+			Show Download Manager Selection Dialog = 0
+			Show Geolocation License Dialog = 0
+			Show Mail Error Dialog = 0
+			Show New Opera Dialog = 0
+			Show Problem Dialog = 0
+			Show Progress Dialog = 0
+			Show Validation Dialog = 0
+			Show Widget Debug Info Dialog = 0
+			Show Startup Dialog = 0
+			Show E-mail Client = 0
+			Show Mail Header Toolbar = 0
+			Show Setupdialog On Start = 0
+			Ask For Usage Stats Percentage = 0
+			Enable Usage Statistics = 0
+			Disable Opera Package AutoUpdate = 1
+			Browser JavaScript = 0
+
+			[Install]
+			Newest Used Version = 1.00.0000
+
+			[State]
+			Accept License = 1
+			Run = 0
+		`.replace(/\t+|^\s+/g, "").replace(/\r?\n/g, EOL);
+		writeFileSync(ini1, prefs, "utf8");
+		writeFileSync(ini2, prefs, "utf8");
+	}
+	// Modern Opera
+	else flags = [
 		"--user-data-dir=" + profile,
 		"--no-default-browser-check",
 		"--no-first-run",
@@ -522,7 +581,6 @@ export async function openOpera(url){
 		"--disable-translate",
 		"--new-window",
 	];
-	existsSync(profile) || mkdirSync(profile);
 	return spawn(path, [...flags, url], {windowsHide: true, stdio: "inherit"});
 }
 
