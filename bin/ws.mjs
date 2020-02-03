@@ -4,6 +4,7 @@ import HTTP from "http";
 import EventEmitter from "events";
 import {fileURLToPath} from "url";
 import {
+	clamp,
 	utf8Decode,
 	utf8Encode,
 	wsDecodeFrame,
@@ -23,7 +24,11 @@ const path = fileURLToPath(import.meta.url);
 		.on("ws:message", ({id}, msg) => console.log(`Client #${id}: ${msg}`))
 		.on("ws:ping",    ({id}) => console.log(`Client #${id}: PING`))
 		.on("ws:pong",    ({id}) => console.log(`Client #${id}: PONG`))
-		.on("ws:open",    ({id}) => console.log(`Client #${id} connected`))
+		.on("ws:open",    ws => {
+			console.log(`Client #${ws.id} connected`);
+			ws.maxSize = 6;
+			ws.send("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+		})
 		.on("ws:close",   ({id}, code, reason) => {
 			let message = `Client #${id} disconnected`;
 			if(code){
@@ -45,10 +50,14 @@ const path = fileURLToPath(import.meta.url);
  * @class
  */
 export class Channel extends EventEmitter{
-	#closed     = false;
-	inputBuffer = [];
-	inputType   = "binary";
-	pendingData = false;
+	#maxSize      = Number.MAX_SAFE_INTEGER;
+	#closed       = false;
+	#sendPromise  = null;
+	inputBuffer   = [];
+	inputPending  = false;
+	inputType     = "binary";
+	outputBuffer  = [];
+	outputPending = false;
 	
 	/**
 	 * Create a new WebSocket connection.
@@ -75,6 +84,20 @@ export class Channel extends EventEmitter{
 	
 	
 	/**
+	 * Maximum payload-length permitted for any single data frame.
+	 *
+	 * @property {Number} maxSize
+	 * @default Number.MAX_SAFE_INTEGER
+	 */
+	get maxSize(){
+		return this.#maxSize;
+	}
+	set maxSize(to){
+		this.#maxSize = clamp(~~Number(to), 1, Number.MAX_SAFE_INTEGER);
+	}
+	
+	
+	/**
 	 * Handle a frame sent from the client.
 	 *
 	 * @param {Buffer} data
@@ -95,7 +118,7 @@ export class Channel extends EventEmitter{
 				this.inputBuffer.push(...data.payload);
 				break;
 			case "continue":
-				if(!this.pendingData) return; // Not expecting any data
+				if(!this.inputPending) return; // Not expecting any data
 				this.inputBuffer.push(...data.payload);
 				break;
 			case "close":
@@ -115,10 +138,10 @@ export class Channel extends EventEmitter{
 					? utf8Encode(this.inputBuffer)
 					: Buffer.from(this.inputBuffer);
 				this.inputBuffer = [];
-				this.pendingData = false;
+				this.inputPending = false;
 				this.emit("ws:message", message);
 			}
-			else this.pendingData = true;
+			else this.inputPending = true;
 		}
 	}
 	
@@ -126,21 +149,31 @@ export class Channel extends EventEmitter{
 	/**
 	 * Send arbitrary data to the client.
 	 *
-	 * @param {String|Uint8Array|Buffer} data
+	 * @param {FrameData|WSFrame[]} data - Message to transmit
+	 * @param {Boolean} [raw=false] - Treat input as pre-encoded frames
 	 * @return {void}
 	 */
-	send(data){
+	send(data, raw = false){
 		if(this.#closed) return;
-		let type = "binary";
-		if("string" === typeof data){
-			data = utf8Decode(data);
-			type = "text";
-		}
-		this.socket.write(wsEncodeFrame({
-			isFinal: true,
-			payload: data,
-			opcode: "binary" === type ? 0x02 : 0x01,
-		}));
+		this.outputBuffer.push(...raw ? data : encode(data, this.maxSize));
+		this.sendNext();
+	}
+	
+	
+	/**
+	 * Send the next pending data-frame.
+	 *
+	 * @internal
+	 * @return {Promise<void>}
+	 */
+	async sendNext(){
+		if(this.#closed) return;
+		await this.#sendPromise;
+		const frame = this.outputBuffer.shift();
+		if(!frame) return;
+		await (this.#sendPromise = new Promise(resolve =>
+			this.socket.write(frame, null, resolve)));
+		this.outputBuffer.length && this.sendNext();
 	}
 	
 	
@@ -224,13 +257,26 @@ export class Server extends HTTP.Server{
 	
 	
 	/**
+	 * Broadcast a message to all open channels.
+	 *
+	 * @param {FrameData} data
+	 * @return {void}
+	 */
+	send(data){
+		data = encode(data);
+		for(const [, channel] of this.connections)
+			channel.send(data, true);
+	}
+	
+	
+	/**
 	 * Establish a WebSocket connection with a client.
 	 *
 	 * @emits ws:open
 	 * @param {HTTP.IncomingMessage} request
 	 * @return {Channel}
 	 */
-	upgrade({socket, headers}){
+	upgrade({socket}){
 		const channel = new Channel(socket);
 		this.connections.set(socket, channel);
 		channel.id = this.connections.size;
@@ -260,3 +306,35 @@ export function isHandshake(request){
 		&& "Upgrade"   === request.headers.connection
 		&& "GET"       === request.method;
 }
+
+
+/**
+ * Encode a message as a sequence of data frames.
+ * @param {FrameData} data
+ * @param {Number} [maxSize=Infinity]
+ * @return {WSFrame[]}
+ */
+export function encode(data, maxSize = Infinity){
+	let opcode = 0x02;
+	if("string" === typeof data){
+		data = utf8Decode(data);
+		opcode = 0x01;
+	}
+	else data = [...data];
+	const frames = [];
+	do{
+		frames.push(wsEncodeFrame({
+			payload: data.splice(0, maxSize),
+			isFinal: !data.length,
+			opcode,
+		}));
+		opcode = 0x00;
+	} while(data.length > 0);
+	return frames;
+}
+
+
+/**
+ * Content to encode for a data frame.
+ * @typedef {String|Uint8Array|Buffer} FrameData
+ */
