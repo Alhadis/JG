@@ -27,6 +27,7 @@ const path = fileURLToPath(import.meta.url);
 		.on("ws:open",    ws => {
 			console.log(`Client #${ws.id} connected`);
 			ws.maxSize = 6;
+			ws.ping();
 			ws.send("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
 		})
 		.on("ws:close",   ({id}, code, reason) => {
@@ -231,7 +232,6 @@ export class Server extends HTTP.Server{
 			response.end();
 		}
 		else if(!this.isConnected(request)){
-			this.upgrade(request);
 			const accept = wsHandshake(request.headers["sec-websocket-key"]);
 			response.writeHead(101, {
 				"Sec-WebSocket-Accept": accept,
@@ -239,6 +239,7 @@ export class Server extends HTTP.Server{
 				Upgrade: "websocket",
 			});
 			response.end();
+			this.upgrade(request);
 		}
 	}
 	
