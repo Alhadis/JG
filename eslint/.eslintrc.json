@@ -93,6 +93,7 @@
 			{
 				"overrides": {
 					"if":      {"after": false},
+					"do":      {"after": false},
 					"else":    {"after": false},
 					"for":     {"after": false},
 					"while":   {"after": false},
