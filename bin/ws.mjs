@@ -224,7 +224,7 @@ export class Channel extends EventEmitter{
  * @class
  */
 export class Server extends HTTP.Server{
-	connections = new Map();
+	channels = new Map();
 	
 	/**
 	 * Initialise a new WebSocket server.
@@ -237,6 +237,15 @@ export class Server extends HTTP.Server{
 	
 	
 	/**
+	 * Iterate through all open channels.
+	 * @return {MapIterator}
+	 */
+	[Symbol.iterator](){
+		return this.channels.values();
+	}
+	
+	
+	/**
 	 * Close all open channels, then shutdown the server.
 	 *
 	 * @param {Number} [code=1001]
@@ -244,7 +253,7 @@ export class Server extends HTTP.Server{
 	 * @return {Promise<void>}
 	 */
 	async close(code = 1001, reason = ""){
-		for(const [, channel] of this.connections)
+		for(const channel of this)
 			await channel.close(code, reason);
 		return new Promise(done => super.close(done));
 	}
@@ -286,7 +295,7 @@ export class Server extends HTTP.Server{
 	isConnected(client){
 		if(client instanceof HTTP.IncomingMessage)
 			client = client.socket;
-		return this.connections.has(client);
+		return this.channels.has(client);
 	}
 	
 	
@@ -298,7 +307,7 @@ export class Server extends HTTP.Server{
 	 */
 	send(data){
 		data = encode(data);
-		for(const [, channel] of this.connections)
+		for(const channel of this)
 			channel.send(data, true);
 	}
 	
@@ -312,13 +321,13 @@ export class Server extends HTTP.Server{
 	 */
 	upgrade({socket}){
 		const channel = new Channel(socket);
-		this.connections.set(socket, channel);
-		channel.id = this.connections.size;
+		this.channels.set(socket, channel);
+		channel.id = this.channels.size;
 		this.emit("ws:open", channel);
 		for(const event of "close incomplete-message message ping pong".split(" "))
 			channel.on(`ws:${event}`, (...args) => this.emit(`ws:${event}`, channel, ...args));
 		channel.once("ws:close", () => {
-			this.connections.delete(socket);
+			this.channels.delete(socket);
 			channel.removeAllListeners();
 		});
 		return channel;
