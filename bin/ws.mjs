@@ -29,6 +29,7 @@ const path = fileURLToPath(import.meta.url);
 			ws.maxSize = 6;
 			ws.ping();
 			ws.send("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+			setTimeout(() => server.close(1000, "Done"), 4000);
 		})
 		.on("ws:close",   ({id}, code, reason) => {
 			let message = `Client #${id} disconnected`;
@@ -95,6 +96,23 @@ export class Channel extends EventEmitter{
 	}
 	set maxSize(to){
 		this.#maxSize = clamp(~~Number(to), 1, Number.MAX_SAFE_INTEGER);
+	}
+	
+	
+	/**
+	 * Terminate the connection.
+	 *
+	 * @param {Number} [code=1000]
+	 * @param {String} [reason=""]
+	 * @return {Promise<void>}
+	 */
+	async close(code = 1000, reason = ""){
+		if(this.#closed) return;
+		this.#closed = true;
+		const payload = code ? [code >> 8 & 255, code & 255, ...utf8Decode(reason)] : [];
+		this.socket.write(wsEncodeFrame({opcode: 0x08, isFinal: true, payload}));
+		this.emit("ws:close", code, reason);
+		return new Promise(done => this.socket.end(done));
 	}
 	
 	
@@ -219,13 +237,28 @@ export class Server extends HTTP.Server{
 	
 	
 	/**
+	 * Close all open channels, then shutdown the server.
+	 *
+	 * @param {Number} [code=1001]
+	 * @param {String} [reason=""]
+	 * @return {Promise<void>}
+	 */
+	async close(code = 1001, reason = ""){
+		for(const [, channel] of this.connections)
+			await channel.close(code, reason);
+		return new Promise(done => super.close(done));
+	}
+	
+	
+	/**
 	 * Respond to an incoming request.
 	 *
 	 * @param {HTTP.IncomingMessage} request
 	 * @param {HTTP.ServerResponse} response
-	 * @return {void}
+	 * @return {Promise<void>}
 	 */
 	async handleRequest(request, response){
+		if(!this.listening) return;
 		if(!isHandshake(request)){
 			response.writeHead(400, {"Content-Type": "text/plain; charset=UTF-8"});
 			response.write("Not a WebSocket handshake");
