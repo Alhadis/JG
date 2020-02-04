@@ -5,7 +5,6 @@ import EventEmitter from "events";
 import {fileURLToPath} from "url";
 import {
 	clamp,
-	escapeCtrl,
 	utf8Decode,
 	utf8Encode,
 	wsDecodeFrame,
@@ -21,28 +20,7 @@ const path = fileURLToPath(import.meta.url);
 	
 	const port = +process.argv[2] || 1338;
 	const server = new Server();
-	server.listen(port)
-		.on("ws:message", (ws, msg) => {
-			msg = Buffer.isBuffer(msg) ? msg.inspect() : msg;
-			console.log(escapeCtrl(`Client #${ws.id}: ${msg}`));
-		})
-		.on("ws:ping",    ({id}) => console.log(`Client #${id}: PING`))
-		.on("ws:pong",    ({id}) => console.log(`Client #${id}: PONG`))
-		.on("ws:open",    ws => {
-			console.log(`Client #${ws.id} connected`);
-			ws.maxSize = 6;
-			ws.ping();
-			ws.send("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-			setTimeout(() => server.close(1000, "Done"), 4000);
-		})
-		.on("ws:close",   ({id}, code, reason) => {
-			let message = `Client #${id} disconnected`;
-			if(code){
-				reason = reason ? ": " + reason : "";
-				message += ` (${code}${reason})`;
-			}
-			console.log(message);
-		});
+	server.listen(port);
 	console.log(`[PID: ${process.pid}] WebSocket server listening on port ${port}`);
 	
 })().catch(error => {
