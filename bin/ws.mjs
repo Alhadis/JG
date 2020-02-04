@@ -5,6 +5,7 @@ import EventEmitter from "events";
 import {fileURLToPath} from "url";
 import {
 	clamp,
+	escapeCtrl,
 	utf8Decode,
 	utf8Encode,
 	wsDecodeFrame,
@@ -21,7 +22,10 @@ const path = fileURLToPath(import.meta.url);
 	const port = +process.argv[2] || 1338;
 	const server = new Server();
 	server.listen(port)
-		.on("ws:message", ({id}, msg) => console.log(`Client #${id}: ${msg}`))
+		.on("ws:message", (ws, msg) => {
+			msg = Buffer.isBuffer(msg) ? msg.inspect() : msg;
+			console.log(escapeCtrl(`Client #${ws.id}: ${msg}`));
+		})
 		.on("ws:ping",    ({id}) => console.log(`Client #${id}: PING`))
 		.on("ws:pong",    ({id}) => console.log(`Client #${id}: PONG`))
 		.on("ws:open",    ws => {
@@ -55,6 +59,7 @@ export class Channel extends EventEmitter{
 	#maxSize      = Number.MAX_SAFE_INTEGER;
 	#closed       = false;
 	#sendPromise  = null;
+	frameBuffer   = [];
 	inputBuffer   = [];
 	inputPending  = false;
 	inputType     = "binary";
@@ -70,7 +75,7 @@ export class Channel extends EventEmitter{
 	constructor(socket){
 		super();
 		this.socket = socket;
-		this.socket.on("data", this.receive.bind(this));
+		this.socket.on("data", this.readBytes.bind(this));
 	}
 	
 	
@@ -117,42 +122,56 @@ export class Channel extends EventEmitter{
 	
 	
 	/**
-	 * Handle a frame sent from the client.
+	 * Handle raw bytes sent from the client.
 	 *
 	 * @param {Buffer} data
 	 * @return {void}
 	 */
-	receive(data){
+	readBytes(data){
 		if(this.#closed) return;
-		data = wsDecodeFrame(data);
-		switch(data.opname){
-			case "ping": this.emit("ws:ping", data); return this.pong();
-			case "pong": this.emit("ws:pong", data); return;
+		this.frameBuffer.push(...data);
+		const {frames, trailer} = decode(this.frameBuffer);
+		this.frameBuffer = trailer;
+		for(const frame of frames)
+			this.readFrame(frame);
+	}
+	
+	
+	/**
+	 * Process a decoded WebSocket frame.
+	 *
+	 * @param {WSFrame} frame
+	 * @return {void}
+	 */
+	readFrame(frame){
+		if(this.#closed) return;
+		switch(frame.opname){
+			case "ping": this.emit("ws:ping", frame); return this.pong();
+			case "pong": this.emit("ws:pong", frame); return;
 			case "binary":
 			case "text":
 				if(this.inputBuffer.length)
 					this.emit("ws:incomplete-message", this.inputBuffer, this.inputType);
-				this.inputBuffer = [];
-				this.inputType = data.opname;
-				this.inputBuffer.push(...data.payload);
+				this.inputBuffer = [...frame.payload];
+				this.inputType = frame.opname;
 				break;
 			case "continue":
 				if(!this.inputPending) return; // Not expecting any data
-				this.inputBuffer.push(...data.payload);
+				this.inputBuffer = this.inputBuffer.concat(frame.payload);
 				break;
 			case "close":
 				this.#closed = true;
-				if(data.payload.length){
-					const code = (255 & data.payload[0]) << 8 | 255 & data.payload[1];
-					const reason = utf8Encode(data.payload.slice(2));
+				if(frame.payload.length){
+					const code = (255 & frame.payload[0]) << 8 | 255 & frame.payload[1];
+					const reason = utf8Encode(frame.payload.slice(2));
 					this.emit("ws:close", code, reason);
 				}
 				else this.emit("ws:close");
 		}
 		
 		// Data frame
-		if(data.opcode < 0x08){
-			if(data.isFinal){
+		if(frame.opcode < 0x08){
+			if(frame.isFinal){
 				const message = "text" === this.inputType
 					? utf8Encode(this.inputBuffer)
 					: Buffer.from(this.inputBuffer);
@@ -348,6 +367,27 @@ export function isHandshake(request){
 		&& "websocket" === request.headers.upgrade
 		&& "Upgrade"   === request.headers.connection
 		&& "GET"       === request.method;
+}
+
+
+/**
+ * Decode a byte-stream as a sequence of WebSocket frames.
+ * @param {Number[]} data
+ * @return {{frames: WSFrame[], trailer: Number[]}}
+ */
+export function decode(data){
+	const frames = [];
+	let frame;
+	do{
+		frame = wsDecodeFrame(data);
+		if(BigInt(frame.payload.length) < frame.length)
+			break;
+		data = frame.trailer;
+		frames.push(frame);
+	} while(data.length);
+	for(const frame of frames)
+		frame.trailer = [];
+	return {frames, trailer: data};
 }
 
 
