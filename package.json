@@ -9,8 +9,8 @@
 	"dependencies": {
 		"alhadis.utils": "latest",
 		"babel-eslint": "^10.0.3",
-		"eslint": "^6.6.0",
-		"eslint-plugin-import": "^2.18.2",
+		"eslint": "^6.8.0",
+		"eslint-plugin-import": "^2.20.1",
 		"get-options": "^1.2.0"
 	}
 }
