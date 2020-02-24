@@ -139,6 +139,7 @@
 		"no-cond-assign": 0,
 		"no-console": 0,
 		"no-control-regex": 0,
+		"no-dupe-else-if": "error",
 		"no-empty": 0,
 		"no-ex-assign": 0,
 		"no-import-assign": "error",
@@ -146,6 +147,7 @@
 		"no-new-require": "error",
 		"no-return-await": "error",
 		"no-self-compare": "error",
+		"no-setter-return": 0,
 		"no-sparse-arrays": 0,
 		"no-trailing-spaces": [
 			"error",
