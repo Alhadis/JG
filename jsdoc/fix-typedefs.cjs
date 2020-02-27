@@ -34,10 +34,4 @@ module.exports.handlers = {
 				return match;
 			});
 	},
-	parseComplete(event){
-		// TODO: Fix line/column numbers of parsed symbols
-		for(const doclet of event.doclets){
-			console.log(doclet.meta);
-		}
-	},
 };
