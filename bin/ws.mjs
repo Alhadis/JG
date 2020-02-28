@@ -3,8 +3,10 @@
 import HTTP from "http";
 import EventEmitter from "events";
 import {fileURLToPath} from "url";
+import getOpts from "get-options";
 import {
 	clamp,
+	uint64ToBytes,
 	utf8Decode,
 	utf8Encode,
 	wsDecodeFrame,
@@ -18,7 +20,10 @@ const path = fileURLToPath(import.meta.url);
 (process.argv[1] === path || globalThis.$0 === path) && (async () => {
 	await Promise.resolve(); // TDZ hack
 	
-	const port = +process.argv[2] || 1338;
+	const {options, argv} = getOpts(process.argv.slice(2), {
+		"-p, --port": "[number=\\d+]",
+	}, {noMixedOrder: true, noUndefined: true, terminator: "--"});
+	const port = +options.port || 1338;
 	const server = new Server();
 	server.listen(port);
 	console.log(`[PID: ${process.pid}] WebSocket server listening on port ${port}`);
@@ -399,3 +404,215 @@ export function encode(data, maxSize = Infinity){
  * Content to encode for a data frame.
  * @typedef {String|Uint8Array|Buffer} FrameData
  */
+
+
+
+/**
+ * Convert a list of values to a compact binary representation.
+ * @param {...*} args
+ * @return {Uint8Array}
+ */
+export function pack(...args){
+	const result = [];
+	for(const arg of args)
+		result.push(...packValue(arg));
+	result.unshift(...uint64ToBytes(BigInt(args.length)));
+	return Uint8Array.from(result);
+}
+
+
+/**
+ * Decode a packed list of encoded arguments.
+ * @param {Number[]|Uint8Array}
+ * @return {Array}
+ */
+export function unpack(bytes){
+	bytes = Array.isArray(bytes) ? Uint8Array.from(bytes) : bytes;
+	const view = new DataView(bytes.buffer);
+	const size = Number(view.getBigUint64(0));
+	let offset = 8;
+	const args = new Array(size);
+	for(let i = 0; offset < bytes.byteLength && i < size;){
+		const [size, value] = unpackValue(bytes.subarray(offset));
+		offset += size;
+		args[i++] = value;
+	}
+	return args;
+}
+
+
+/**
+ * Convert a single value to a binary representation.
+ * @param {*} input
+ * @return {Number[]}
+ * @internal
+ */
+export function packValue(input){
+	if(Number.isNaN(input))  return [0x02];
+	if(Object.is(input, -0)) return [0x07];
+	switch(input){
+		case undefined: return [0x00];
+		case null:      return [0x01];
+		case true:      return [0x03];
+		case false:     return [0x04];
+		case Infinity:  return [0x05];
+		case -Infinity: return [0x06];
+	}
+	let bytes, size, type;
+	switch(input.constructor){
+		case Number:
+		case BigInt:
+			// Float
+			if(~~input !== input){
+				bytes = new DataView(new ArrayBuffer(8));
+				bytes.setFloat64(0, Number(input));
+				return [26, ...new Uint8Array(bytes.buffer)];
+			}
+			// Unsigned integer
+			else if((input = BigInt(input)) >= 0n){
+				if(input <= 255n)                  [size, type] = [1, "Uint8"];
+				else if(input <= (2n ** 16n) - 1n) [size, type] = [2, "Uint16"];
+				else if(input <= (2n ** 32n) - 1n) [size, type] = [4, "Uint32"];
+				else if(input <= (2n ** 64n) - 1n) [size, type] = [8, "Uint64"];
+			}
+			// Signed integer
+			else if(input < 0n){
+				if(input >= -127n)                  [size, type] = [1, "Int8"];
+				else if(input >= -(2n ** 15n) + 1n) [size, type] = [2, "Int16"];
+				else if(input >= -(2n ** 31n) + 1n) [size, type] = [4, "Int32"];
+				else if(input >= -(2n ** 63n) + 1n) [size, type] = [8, "Int64"];
+			}
+			// Too-damn-big integer
+			if(!type){
+				type  = input < 0 ? (input = -input, 28) : 27;
+				input = input.toString(16);
+				bytes = input.padStart(input.length + (input.length % 2), "0").match(/.{2}/g);
+				size  = uint64ToBytes(BigInt(bytes.length));
+				return [type, ...size, ...new Uint8Array(bytes.map(x => parseInt(x, 16)))];
+			}
+			bytes = new DataView(new ArrayBuffer(size));
+			type.endsWith("64") ? bytes["setBig" + type](0, input) : bytes["set" + type](0, Number(input));
+			type = "Uint8 Uint16 Uint32 Uint64 Int8 Int16 Int32 Int64".split(" ").indexOf(type) + 8;
+			return [type, ...new Uint8Array(bytes.buffer)];
+		
+		case Uint8Array:     case Int8Array:
+		case Uint16Array:    case Int16Array:
+		case Uint32Array:    case Int32Array:
+		case BigUint64Array: case BigInt64Array:
+		case Float32Array:   case Float64Array:
+			bytes = new Uint8Array(input.buffer);
+			size = uint64ToBytes(BigInt(bytes.length));
+			type = [
+				Uint8Array,   Uint16Array, Uint32Array, BigUint64Array,
+				Int8Array,    Int16Array,  Int32Array,  BigInt64Array,
+				Float32Array, Float64Array,
+			].indexOf(input.constructor) + 16;
+			return [type, ...size, ...bytes];
+		
+		case Date:
+			input = "Invalid Date" === input.toString() ? input.toString() : input.toISOString();
+			input = utf8Decode(input);
+			size = BigInt(input.length);
+			return [29, ...uint64ToBytes(size), ...input];
+		
+		case String:
+			input = utf8Decode(input);
+			size = BigInt(input.length);
+			return [30, ...uint64ToBytes(size), ...input];
+		
+		case RegExp:
+			let flags = 0;
+			if(input.global)     flags |= 1;
+			if(input.ignoreCase) flags |= 1 << 1;
+			if(input.multiline)  flags |= 1 << 2;
+			if(input.dotAll)     flags |= 1 << 3;
+			if(input.unicode)    flags |= 1 << 4;
+			if(input.sticky)     flags |= 1 << 5;
+			input = utf8Decode(input.source);
+			size  = uint64ToBytes(BigInt(input.length));
+			return [31, ...size, flags, ...input];
+		
+		default:
+			input = utf8Decode(JSON.stringify(input));
+			size = uint64ToBytes(BigInt(input.length));
+			return [32, ...size, ...input];
+	}
+}
+
+
+/**
+ * Decode the binary representation of a single value.
+ * @param {Uint8Array} bytes
+ * @return {Array.<BigInt, *>}
+ * @internal
+ */
+export function unpackValue(input){
+	if(!input || !input.length)
+		throw new TypeError("Cannot unpack empty buffer");
+	const [type] = input;
+	const view = new DataView(input.buffer, input.byteOffset + 1);
+	const size = view.byteLength >= 8 ? Number(view.getBigUint64(0)) : 0;
+	switch(type){
+		case 0: return [1, undefined];
+		case 1: return [1, null];
+		case 2: return [1, NaN];
+		case 3: return [1, true];
+		case 4: return [1, false];
+		case 5: return [1, Infinity];
+		case 6: return [1, -Infinity];
+		case 7: return [1, -0];
+	}
+	// Single number (predetermined size)
+	if(type > 7 && type < 16 || 26 === type)
+		switch(type){
+			case 8:  return [2, view.getUint8(0)];
+			case 9:  return [3, view.getUint16(0)];
+			case 10: return [5, view.getUint32(0)];
+			case 11: return [9, view.getBigUint64(0)];
+			case 12: return [2, view.getInt8(0)];
+			case 13: return [3, view.getInt16(0)];
+			case 14: return [5, view.getInt32(0)];
+			case 15: return [9, view.getBigInt64(0)];
+			case 26: return [9, view.getFloat64(0)];
+		}
+	
+	// Multiple numbers
+	if(type > 15 && type < 26){
+		const list = [
+			Uint8Array,   Uint16Array, Uint32Array, BigUint64Array,
+			Int8Array,    Int16Array,  Int32Array,  BigInt64Array,
+			Float32Array, Float64Array,
+		][type - 16];
+		return [9, new list(input.slice(9, 9 + (size * list.BYTES_PER_ELEMENT)).buffer)];
+	}
+	
+	// BigInt (variable-length)
+	if(27 === type || 28 === type){
+		input = [...input.subarray(9, 9 + size)].map(x => x.toString(16).padStart(2, "0"));
+		return [9 + size, BigInt("0x" + input.join("")) * (28 === type ? -1n : 1n)];
+	}
+	
+	// RegExp
+	if(31 === type){
+		const flags = view.getUint8(8);
+		let flagStr = "";
+		if(flags & 1)      flagStr += "g";
+		if(flags & 1 << 1) flagStr += "i";
+		if(flags & 1 << 2) flagStr += "m";
+		if(flags & 1 << 3) flagStr += "s";
+		if(flags & 1 << 4) flagStr += "u";
+		if(flags & 1 << 5) flagStr += "y";
+		return [10 + size, new RegExp(utf8Encode(input.subarray(10, 10 + size)), flagStr)];
+	}
+	
+	// String-like data
+	input = utf8Encode(input.subarray(9, 9 + size));
+	switch(type){
+		case 29: return [9 + size, new Date(input)];
+		case 30: return [9 + size, input];
+		case 32: return [9 + size, JSON.parse(input)];
+	}
+	
+	// Unknown/invalid type
+	throw new TypeError(`Unrecognised type identifier: 0x${type.toString(16).toUpperCase()}`);
+}

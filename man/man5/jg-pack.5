@@ -1,0 +1,235 @@
+'\" ep
+.\" -*- nroff -*-
+.Dd February 28, 2020
+.Dt JG-PACK 5
+.Os
+.Sh NAME
+.Nm pack
+.Nd serialisation format for isomorphic WebSocket exchange
+.
+.Sh SYNOPSIS
+.Bd -literal
+.Sy import Bro "pack, unpack" Brc Sy from Qq Em "jg/bin/ws.mjs" ;
+\&
+.Sy let No encoded = Sy pack   Ns Po Ar \.\.\.args Pc ;
+.Sy let No decoded = Sy unpack Ns Po Ar \.\.\.encoded Pc ;
+.Ed
+.
+.Sh DESCRIPTION
+This document describes a custom binary format used by
+.Xr jg-ws 1
+for over-the-wire exchange of simple JavaScript objects.
+It offers a limited but portable alternative to V8\(cqs serialisation API,
+which is unavailable in browser environments (and therefore unsuitable for purely-isomorphic code).
+.
+.Pp
+Unless stated otherwise, all values are encoded using network (big-endian) byte-order.
+.
+.Pp
+A
+.Nm Ap d
+byte-stream starts with a uint64 holding the number of elements in the stream.
+Each element contains one or more fields, depending on its content.
+.
+.Ss Constants
+The following JavaScript values are stored as single-byte entries uniquely identified by their
+.Ar type :
+.Pp
+.Bl -tag -width 2n -offset 6n -compact
+.It Sy 0
+.	Li undefined
+.It Sy 1
+.	Li null
+.It Sy 2
+.	Li NaN
+.It Sy 3
+.	Li true
+.It Sy 4
+.	Li false
+.It Sy 5
+.	Li Infinity
+.It Sy 6
+.	Li -Infinity
+.It Sy 7
+.	Li -0
+.	Pq signed zero
+.El
+.
+.
+.Ss Integers
+Individual
+.Li Number
+and
+.Li BigInt
+values are encoded with a
+.Ar type
+and
+.Ar value
+field, the former occupying between 1-8 bytes of storage.
+Unlike the other type-encodings, the
+.Ar width
+field is implicit and derived from the byte-width of the corresponding C data-type.
+Supported integer formats are:
+.
+.Pp
+.ta 4n 8n
+.Bl -tag -width 2n -offset 6n -compact
+.It Sy 8
+.	Li uint8\t Pq Sy Number , No 1 byte
+.It Sy 9
+.	Li uint16\t Pq Sy Number , No 2 bytes
+.It Sy 10
+.	Li uint32\t Pq Sy Number , No 4 bytes
+.It Sy 11
+.	Li uint64\t Pq Sy BigInt , No 8 bytes
+.It Sy 12
+.	Li int8\t Pq Sy Number , No 1 byte
+.It Sy 13
+.	Li int16\t Pq Sy Number , No 2 bytes
+.It Sy 14
+.	Li int32\t Pq Sy Number , No 4 bytes
+.It Sy 15
+.	Li int64\t Pq Sy BigInt , No 8 bytes
+.El
+.
+.Pp
+Note that a decoded integer\(cqs type might not necessarily match that of its original.
+For example, a
+.Li BigInt
+value of
+.Li 5n
+is small enough to fit into a single uint8,
+which will be read back out as a
+.Li Number
+value instead.
+.
+.
+.Ss Typed Arrays
+A sequence of homogenous integers is stored using a JavaScript
+.Li TypedArray .
+Such entries are encoded with a
+.Ar type , width ,
+and variable-length
+.Ar value
+fields.
+Supported
+.Ar type
+mappings and their corresponding JavaScript types are:
+.
+.Pp
+.Bl -tag -width 2n -offset 6n -compact
+.It Sy 16
+.	Li Uint8Array
+.It Sy 17
+.	Li Uint16Array
+.It Sy 18
+.	Li Uint32Array
+.It Sy 19
+.	Li BigUint64Array
+.It Sy 20
+.	Li Int8Array
+.It Sy 21
+.	Li Int16Array
+.It Sy 22
+.	Li Int32Array
+.It Sy 23
+.	Li BigInt64Array
+.El
+.
+.Ss Other
+The remaining type mappings don\(cqt belong in any of the preceding categories.
+More types may be added in future, if needed.
+.Pp
+.Bl -tag -width 2n -offset 6n -compact
+.It Sy 24
+.	Li Float32Array
+.It Sy 25
+.	Li Float64Array
+.It Sy 26
+.	Li Float64
+.	br
+An ordinary JavaScript
+.	Sy Number
+with a trailing decimal component.
+Because all ECMAScript numbers are represented internally as 64-bit IEEE floating-points,
+this type is the default for any value that doesn\(cqt cleanly fit into an integer type.
+See
+.	Sx Integers
+above.
+.
+.It Sy 27
+.	Li BigInt, Positive
+.It Sy 28
+.	Li BigInt, Negative
+.	br
+An arbitrary-length
+.	Sy BigInt
+literal stored as a sequence of uint8 values, each corresponding to 2 hex digits of the encoded literal.
+Only used for encoding values greater than
+.	ie n (\fI2\fP^\fI64\fP)-\fI1\fP.
+.	el \{
+.	EQ
+( 2 sup 64 ) - 1
+.	EN
+.	\}
+or less than
+.	ie n (-\fI2\fP^\fI63\fP)+\fI1\fP.
+.	el \{
+.	EQ
+- ( 2 sup 63 ) + 1
+.	EN
+.	\}
+Typically, these will rarely be used or needed.
+.
+.
+.It Sy 29
+.	Li Date
+.	br
+A UTF-8 encoded string containing either an ISO\|8601 date string
+.	Pq such as Li 2020-02-28T07:19:27.102Z ,
+or the text
+.	Dq Em Invalid Date .
+.
+.It Sy 30
+.	Li String
+.	br
+A UTF-8 encoded string literal.
+.
+.It Sy 31
+.	Li RegExp
+.	br
+A UTF-8 encoded string representing the
+.	Li / Ns Em source Ns Li /
+of an ECMAScript regular expression literal.
+The entry is encoded with the fields
+.	Ar type , width , flags ,
+and
+.	Ar value Pq No the actual regex Em source .
+.	Ar flags
+is an uint8 bitmask enumerated with the following fields:
+.	Pp
+.	Bl -tag -width 10n -offset 6n -compact
+.		It Sy 0000\~0001
+.			Li global
+.		It Sy 0000\~0010
+.			Li ignoreCase
+.		It Sy 0000\~0100
+.			Li multiline
+.		It Sy 0000\~1000
+.			Li dotAll
+.		It Sy 0001\~0000
+.			Li unicode
+.		It Sy 0010\~0000
+.			Li sticky
+.	El
+.
+.It Sy 32
+.	Li JSON
+.	br
+Arbitrary UTF-8 encoded JSON data.
+Used as a catchall for any object which doesn't have a more specialised type.
+Note that complex or self-referential structures will result in data-loss or even an error;
+unlike the HTML structured clone algorithm (used by V8's serialisation API), the
+.	Nm
+format lacks support for object references, class instances, or anything more specialised than generic JSON.
+.El
