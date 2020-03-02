@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 
 import HTTP from "http";
+import {resolve} from "path";
+import {readFileSync} from "fs";
 import EventEmitter from "events";
 import {fileURLToPath} from "url";
 import getOpts from "get-options";
 import {
 	clamp,
+	deindent as HTML,
 	uint64ToBytes,
 	utf8Decode,
 	utf8Encode,
@@ -24,9 +27,10 @@ const path = fileURLToPath(import.meta.url);
 		"-p, --port": "[number=\\d+]",
 	}, {noMixedOrder: true, noUndefined: true, terminator: "--"});
 	const port = +options.port || 1338;
-	const server = new Server();
-	server.listen(port);
+	const app = new App(argv[0]);
+	app.listen(port);
 	console.log(`[PID: ${process.pid}] WebSocket server listening on port ${port}`);
+	useGracefulQuit();
 	
 })().catch(error => {
 	console.error(error);
@@ -406,6 +410,227 @@ export function encode(data, maxSize = Infinity){
  */
 
 
+/**
+ * Helper class to facilitate running single-file WebSocket apps.
+ * @class
+ */
+export class App extends Server{
+	
+	/**
+	 * Initialise a dev-server for a WebSocket app.
+	 *
+	 * @example new App("./draw-canvas.mjs").listen(1338);
+	 * @param {String} [file] - Path to app-file
+	 * @constructor
+	 */
+	constructor(file){
+		super();
+		this.timeStarted = new Date();
+		if(file){
+			this.file = resolve(file);
+			this.source = readFileSync(file, "utf8");
+			this.on("listening", this.onListen.bind(this));
+		}
+	}
+	
+	
+	/**
+	 * Handler fired when the server begins listening for connections.
+	 * @internal
+	 */
+	async onListen(){
+		const {server, client, title} = await import(this.file);
+		this.title = title || "";
+		sockify(client, this);
+		if(server && "function" === typeof server.init)
+			server.init.call(this);
+	}
+	
+	
+	/**
+	 * Provide an HTTP entry-point into the WebSocket app.
+	 *
+	 * @augments Server#handleRequest
+	 * @param {HTTP.IncomingMessage} request
+	 * @param {HTTP.ServerResponse} response
+	 * @return {Promise<void>}
+	 * @internal
+	 */
+	async handleRequest(request, response){
+		if(isHandshake(request))
+			return super.handleRequest(request, response);
+		
+		request.ifModifiedSince = new Date(request.headers["if-modified-since"]);
+		switch(request.url){
+			case "/":
+			case "/index.htm":
+			case "/index.html": return this.sendIndex(request, response);
+			case "/utils.mjs":  return this.sendUtils(request, response);
+			case "/app.mjs":    return this.sendApp(request, response);
+		}
+		return super.handleRequest(request, response);
+	}
+	
+	
+	/**
+	 * Serve the app-file defining both the client and server's behaviours.
+	 * @param {HTTP.IncomingMessage} request
+	 * @param {HTTP.ServerResponse} response
+	 * @return {void}
+	 * @internal
+	 */
+	sendApp(request, response){
+		if(request.ifModifiedSince > this.timeStarted){
+			response.writeHead(304);
+			return response.end();
+		}
+		response.writeHead(200, {
+			"Cache-Control": "max-age=7200",
+			"Content-Type": "text/javascript; charset=UTF-8",
+			"Content-Length": this.source.length,
+			"Last-Modified": this.timeStarted.toUTCString(),
+		});
+		response.write(this.source);
+		response.end();
+	}
+	
+	
+	/**
+	 * Serve the `index.html` file needed as an entry-point into the app.
+	 * @param {HTTP.IncomingMessage} request
+	 * @param {HTTP.ServerResponse} response
+	 * @return {void}
+	 * @internal
+	 */
+	sendIndex(request, response){
+		if(request.ifModifiedSince > this.timeStarted){
+			response.writeHead(304);
+			return response.end();
+		}
+		response.writeHead(200, {
+			"Cache-Control": "max-age=7200",
+			"Content-Type": "text/html; charset=UTF-8",
+			"Last-Modified": this.timeStarted.toUTCString(),
+		});
+		response.write(HTML `
+			<!DOCTYPE html>
+			<html lang="en-AU">
+			<head>
+			<meta charset="UTF-8" />
+			<meta name="viewport" content="initial-scale=1, minimum-scale=1" />
+			<title>${this.title || ""}</title>
+			</head>
+			<body>
+				<script type="module">
+					import {client, server} from "./app.mjs";
+					import {sockify, unpack} from "./utils.mjs";
+					
+					const {hostname, port} = location;
+					const ws = new WebSocket("ws://" + hostname + ":" + port);
+					sockify(server, window.ws = ws);
+					ws.binaryType = "arraybuffer";
+					ws.addEventListener("message", async event => {
+						const [id, name, ...args] = unpack(event.data);
+						if("function" === typeof client[name]){
+							const result = await client[name](...args);
+							ws.send(id, name, result);
+						}
+					});
+					if("function" === typeof client.init)
+						ws.addEventListener("open", () => client.init.call(ws));
+				</script>
+			</body>
+			</html>`);
+		response.end();
+	}
+	
+	
+	/**
+	 * Send file containing functions shared by both client and server.
+	 * @param {HTTP.IncomingMessage} request
+	 * @param {HTTP.ServerResponse} response
+	 * @return {void}
+	 * @internal
+	 */
+	sendUtils(request, response){
+		if(request.ifModifiedSince > this.timeStarted){
+			response.writeHead(304);
+			return response.end();
+		}
+		const utils = [
+			sockify,
+			pack,
+			packValue,
+			unpack,
+			unpackValue,
+			utf8Decode,
+			utf8Encode,
+			uint64ToBytes,
+		].map(fn => `export ${fn}`).join("\n");
+		response.writeHead(200, {
+			"Cache-Control": "max-age=7200",
+			"Content-Type": "text/javascript; charset=UTF-8",
+			"Content-Length": utils.length,
+			"Last-Modified": this.timeStarted.toUTCString(),
+		});
+		response.write(utils);
+		response.end();
+	}
+}
+
+
+/**
+ * Hide the ^C echoed to terminal when terminating the process.
+ * @param {Function} [fn=null]
+ * @return {void}
+ */
+export function useGracefulQuit(fn = null){
+	const halt = () => {
+		if("function" === typeof fn) fn();
+		process.stdin.setRawMode(false);
+		process.exit(0);
+	};
+	process.stdin.setRawMode(true);
+	process.stdin.on("data", data => (0x03 === data[0] || 0x04 === data[0]) && halt());
+	process.on("beforeExit", () => process.stdin.setRawMode(false));
+	process.on("SIGINT", halt);
+	process.on("SIGTERM", halt);
+}
+
+
+/**
+ * Replace an endpoint's methods with ones to turn function-calls into WS messages.
+ * @param {Object} obj
+ * @param {WebSocket|Server} sender
+ * @internal
+ */
+export function sockify(obj, sender){
+	const props = Object.getOwnPropertyDescriptors(obj);
+	let callID = 0;
+	for(const [name, {value, configurable, enumerable}] of Object.entries(props)){
+		if(!configurable || "function" !== typeof value) continue;
+		Object.defineProperty(obj, name, {
+			configurable: true,
+			writable: false,
+			enumerable,
+			async value(...args){
+				const id = callID++;
+				sender.send(args = pack(id, name, ...args));
+				return new Promise(resolve => {
+					const fn = event => {
+						const args = unpack(event.data);
+						if(id === args[0] && name === args[1]){
+							sender.removeEventListener("message", fn);
+							resolve(args.slice(2));
+						}
+					};
+					sender.addEventListener("message", fn);
+				});
+			},
+		});
+	}
+}
+
 
 /**
  * Convert a list of values to a compact binary representation.
@@ -427,7 +652,10 @@ export function pack(...args){
  * @return {Array}
  */
 export function unpack(bytes){
-	bytes = Array.isArray(bytes) ? Uint8Array.from(bytes) : bytes;
+	if(Array.isArray(bytes))
+		bytes = Uint8Array.from(bytes);
+	else if(bytes instanceof ArrayBuffer)
+		bytes = new Uint8Array(bytes);
 	const view = new DataView(bytes.buffer);
 	const size = Number(view.getBigUint64(0));
 	let offset = 8;
