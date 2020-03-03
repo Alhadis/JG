@@ -441,9 +441,16 @@ export class App extends Server{
 	async onListen(){
 		const {server, client, title} = await import(this.file);
 		this.title = title || "";
+		proxify(server, this);
 		sockify(client, this);
-		if(server && "function" === typeof server.init)
-			server.init.call(this);
+		if("function" === typeof server.init)
+			server.init(this);
+		
+		this.on("ws:message", async (ws, data) => {
+			const [isCmd, id, name, ...args] = unpack(data);
+			if(isCmd && "function" === typeof server[name])
+				ws.send(pack(false, id, name, await server[name](...args)));
+		});
 	}
 	
 	
@@ -523,21 +530,22 @@ export class App extends Server{
 			<body>
 				<script type="module">
 					import {client, server} from "./app.mjs";
-					import {sockify, unpack} from "./utils.mjs";
+					import {pack, proxify, sockify, unpack} from "./utils.mjs";
 					
 					const {hostname, port} = location;
 					const ws = new WebSocket("ws://" + hostname + ":" + port);
+					proxify(client, ws);
 					sockify(server, window.ws = ws);
 					ws.binaryType = "arraybuffer";
 					ws.addEventListener("message", async event => {
-						const [id, name, ...args] = unpack(event.data);
-						if("function" === typeof client[name]){
+						const [isCmd, id, name, ...args] = unpack(event.data);
+						if(isCmd && "function" === typeof client[name]){
 							const result = await client[name](...args);
-							ws.send(id, name, result);
+							ws.send(pack(false, id, name, result));
 						}
 					});
 					if("function" === typeof client.init)
-						ws.addEventListener("open", () => client.init.call(ws));
+						ws.addEventListener("open", () => client.init(ws));
 				</script>
 			</body>
 			</html>`);
@@ -558,6 +566,8 @@ export class App extends Server{
 			return response.end();
 		}
 		const utils = [
+			replaceMethods,
+			proxify,
 			sockify,
 			pack,
 			packValue,
@@ -599,36 +609,76 @@ export function useGracefulQuit(fn = null){
 
 
 /**
- * Replace an endpoint's methods with ones to turn function-calls into WS messages.
+ * Bind an object's methods to a {@link Proxy} to quicken access to {@link App}
+ * and {@link WebSocket} instance methods (without extending the object itself).
+ *
  * @param {Object} obj
- * @param {WebSocket|Server} sender
+ * @param {WebSocket|Server} context
+ * @return {void}
  * @internal
  */
-export function sockify(obj, sender){
+export function proxify(obj, context){
+	const proxy = new Proxy(obj, {
+		get(target, property){
+			return Reflect.has(obj, property)
+				? Reflect.get(obj, property)
+				: Reflect.get(context, property);
+		},
+	});
+	replaceMethods(obj, (name, fn) => fn.bind(proxy));
+}
+
+
+/**
+ * Monkey-patch the configurable methods of an object.
+ * @param {Object} obj
+ * @param {MethodReplacer} cb
+ * @return {Object} Reference to the subject
+ * @internal
+ */
+export function replaceMethods(obj, cb){
 	const props = Object.getOwnPropertyDescriptors(obj);
-	let callID = 0;
 	for(const [name, {value, configurable, enumerable}] of Object.entries(props)){
 		if(!configurable || "function" !== typeof value) continue;
 		Object.defineProperty(obj, name, {
 			configurable: true,
 			writable: false,
 			enumerable,
-			async value(...args){
-				const id = callID++;
-				sender.send(args = pack(id, name, ...args));
-				return new Promise(resolve => {
-					const fn = event => {
-						const args = unpack(event.data);
-						if(id === args[0] && name === args[1]){
-							sender.removeEventListener("message", fn);
-							resolve(args.slice(2));
-						}
-					};
-					sender.addEventListener("message", fn);
-				});
-			},
+			value: cb(name, value),
 		});
 	}
+	return obj;
+}
+
+
+/**
+ * Replace an endpoint's methods with ones to turn function-calls into WS messages.
+ * @param {Object} obj
+ * @param {WebSocket|Server} sender
+ * @return {void}
+ * @internal
+ */
+export function sockify(obj, sender){
+	let callID = 0;
+	const isServer = "function" === typeof App && sender instanceof App;
+	replaceMethods(obj, name => async (...args) => {
+		const id = callID++;
+		args.unshift(true, id, name);
+		sender.send(pack(...args));
+		const [on, off, msgEvent] = isServer
+			? ["on", "off", "ws:message"]
+			: ["addEventListener", "removeEventListener", "message"];
+		return new Promise(resolve => {
+			const fn = (ws, args) => {
+				args = unpack(isServer ? args : ws.data);
+				if(id === args[0] && name === args[1]){
+					sender[off](msgEvent, fn);
+					resolve(args.slice(2));
+				}
+			};
+			sender[on](msgEvent, fn);
+		}).catch(e => console.error(e));
+	});
 }
 
 
@@ -652,10 +702,10 @@ export function pack(...args){
  * @return {Array}
  */
 export function unpack(bytes){
-	if(Array.isArray(bytes))
-		bytes = Uint8Array.from(bytes);
-	else if(bytes instanceof ArrayBuffer)
+	if(bytes instanceof ArrayBuffer)
 		bytes = new Uint8Array(bytes);
+	else bytes = Uint8Array.from(bytes);
+	if(bytes.length < 8) return []; // TODO: Remove once varints are used
 	const view = new DataView(bytes.buffer);
 	const size = Number(view.getBigUint64(0));
 	let offset = 8;
@@ -686,6 +736,9 @@ export function packValue(input){
 		case Infinity:  return [0x05];
 		case -Infinity: return [0x06];
 	}
+	// Node.js: Replace Buffer objects with Uint8Arrays
+	if("function" === typeof Buffer && input instanceof Buffer)
+		input = Uint8Array.from(input);
 	let bytes, size, type;
 	switch(input.constructor){
 		case Number:
@@ -722,6 +775,10 @@ export function packValue(input){
 			type.endsWith("64") ? bytes["setBig" + type](0, input) : bytes["set" + type](0, Number(input));
 			type = "Uint8 Uint16 Uint32 Uint64 Int8 Int16 Int32 Int64".split(" ").indexOf(type) + 8;
 			return [type, ...new Uint8Array(bytes.buffer)];
+		
+		case ArrayBuffer:
+		case Uint8ClampedArray:
+			input = new Uint8Array(input); // Fall-through
 		
 		case Uint8Array:     case Int8Array:
 		case Uint16Array:    case Int16Array:
@@ -811,7 +868,8 @@ export function unpackValue(input){
 			Int8Array,    Int16Array,  Int32Array,  BigInt64Array,
 			Float32Array, Float64Array,
 		][type - 16];
-		return [9, new list(input.slice(9, 9 + (size * list.BYTES_PER_ELEMENT)).buffer)];
+		input = new list(input.slice(9, 9 + (size * list.BYTES_PER_ELEMENT)).buffer);
+		return [9 + input.length, input];
 	}
 	
 	// BigInt (variable-length)

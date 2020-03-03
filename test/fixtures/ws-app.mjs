@@ -10,9 +10,6 @@ export const server = {
 		this.on("ws:close", ws => console.log(`Client ${ws.id} disconnected`));
 		this.on("ws:ping",  ws => console.log(`Client ${ws.id} pinged`));
 		this.on("ws:pong",  ws => console.log(`Client ${ws.id} ponged`));
-		this.on("ws:message", (ws, ...data) => {
-			console.log(`Client ${ws.id}: ${data}`);
-		});
 	},
 	
 	log(...args){
