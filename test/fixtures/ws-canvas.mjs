@@ -13,10 +13,10 @@ export const server = {
 	},
 	
 	async saveImageFile(data, type, filename){
-		console.log(`Image received (${data.length} bytes, MIME type ${type})`);
+		console.log(`Image received (${data.byteLength} bytes, MIME type ${type})`);
 		const {writeFileSync} = await import("fs");
 		const {resolve} = await import("path");
-		writeFileSync(filename = resolve(filename), data, {encoding: null});
+		writeFileSync(filename = resolve(filename), new Uint8Array(data), {encoding: null});
 		console.log(`Saved to ${filename}`);
 		process.exit(0);
 	},

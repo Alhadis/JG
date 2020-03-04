@@ -1,6 +1,6 @@
 '\" ep
 .\" -*- nroff -*-
-.Dd February 28, 2020
+.Dd March 4, 2020
 .Dt JG-PACK 5
 .Os
 .Sh NAME
@@ -119,21 +119,29 @@ mappings and their corresponding JavaScript types are:
 .Pp
 .Bl -tag -width 2n -offset 6n -compact
 .It Sy 16
-.	Li Uint8Array
+.	Li ArrayBuffer
 .It Sy 17
-.	Li Uint16Array
+.	Li Uint8ClampedArray
 .It Sy 18
-.	Li Uint32Array
+.	Li Uint8Array
 .It Sy 19
-.	Li BigUint64Array
+.	Li Uint16Array
 .It Sy 20
-.	Li Int8Array
+.	Li Uint32Array
 .It Sy 21
-.	Li Int16Array
+.	Li BigUint64Array
 .It Sy 22
-.	Li Int32Array
+.	Li Int8Array
 .It Sy 23
+.	Li Int16Array
+.It Sy 24
+.	Li Int32Array
+.It Sy 25
 .	Li BigInt64Array
+.It Sy 26
+.	Li Float32Array
+.It Sy 27
+.	Li Float64Array
 .El
 .
 .Ss Other
@@ -141,11 +149,7 @@ The remaining type mappings don\(cqt belong in any of the preceding categories.
 More types may be added in future, if needed.
 .Pp
 .Bl -tag -width 2n -offset 6n -compact
-.It Sy 24
-.	Li Float32Array
-.It Sy 25
-.	Li Float64Array
-.It Sy 26
+.It Sy 28
 .	Li Float64
 .	br
 An ordinary JavaScript
@@ -157,9 +161,9 @@ See
 .	Sx Integers
 above.
 .
-.It Sy 27
+.It Sy 29
 .	Li BigInt, Positive
-.It Sy 28
+.It Sy 30
 .	Li BigInt, Negative
 .	br
 An arbitrary-length
@@ -182,7 +186,7 @@ or less than
 Typically, these will rarely be used or needed.
 .
 .
-.It Sy 29
+.It Sy 31
 .	Li Date
 .	br
 A UTF-8 encoded string containing either an ISO\|8601 date string
@@ -190,12 +194,12 @@ A UTF-8 encoded string containing either an ISO\|8601 date string
 or the text
 .	Dq Em Invalid Date .
 .
-.It Sy 30
+.It Sy 32
 .	Li String
 .	br
 A UTF-8 encoded string literal.
 .
-.It Sy 31
+.It Sy 33
 .	Li RegExp
 .	br
 A UTF-8 encoded string representing the
@@ -223,7 +227,7 @@ is an uint8 bitmask enumerated with the following fields:
 .			Li sticky
 .	El
 .
-.It Sy 32
+.It Sy 34
 .	Li JSON
 .	br
 Arbitrary UTF-8 encoded JSON data.

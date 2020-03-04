@@ -1,7 +1,11 @@
 import assert from "assert";
 import {pack, unpack, unpackValue} from "../bin/ws.mjs";
 
-const test = (...args) => assert.deepStrictEqual(unpack(pack(...args)), args);
+const test = (...args) => {
+	assert.deepStrictEqual(args, unpack(pack(...args)));
+	assert.deepStrictEqual(args = [...args, ...args], unpack(pack(...args)));
+	assert.deepStrictEqual(args = [...args, ...args], unpack(pack(...args)));
+};
 test(24);
 test("foo", 15, 902);
 test("foo", /abc/g);
@@ -15,6 +19,8 @@ test((2n ** 64n) + 4n, -(2n ** 64n) - 4n);
 test(undefined, null, NaN, true, false, Infinity, -Infinity, -0);
 test(255, 65535, 4294967289, 2147483645, 9223372036854775807n);
 test(-127, -32767, -2147483647, -0x3FFFFFFFFFFFFFFFn);
+test(new Uint8Array([1, 2, 3, 4]).buffer);
+test(new Uint8ClampedArray([20, 0, 1, 4, 64, 127, 255]));
 test(new Uint8Array([20, 0, 1, 4, 64, 127, 255]));
 test(new Uint16Array([0, 8, 64, 128, 255, 512, 65530, 65535]));
 test(new Uint32Array([0, 1, 10, 64, 256, 1024, 4294967290, 4294967295]));

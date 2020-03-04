@@ -747,7 +747,7 @@ export function packValue(input){
 			if(~~input !== input){
 				bytes = new DataView(new ArrayBuffer(8));
 				bytes.setFloat64(0, Number(input));
-				return [26, ...new Uint8Array(bytes.buffer)];
+				return [28, ...new Uint8Array(bytes.buffer)];
 			}
 			// Unsigned integer
 			else if((input = BigInt(input)) >= 0n){
@@ -765,7 +765,7 @@ export function packValue(input){
 			}
 			// Too-damn-big integer
 			if(!type){
-				type  = input < 0 ? (input = -input, 28) : 27;
+				type  = input < 0 ? (input = -input, 30) : 29;
 				input = input.toString(16);
 				bytes = input.padStart(input.length + (input.length % 2), "0").match(/.{2}/g);
 				size  = uint64ToBytes(BigInt(bytes.length));
@@ -776,18 +776,16 @@ export function packValue(input){
 			type = "Uint8 Uint16 Uint32 Uint64 Int8 Int16 Int32 Int64".split(" ").indexOf(type) + 8;
 			return [type, ...new Uint8Array(bytes.buffer)];
 		
-		case ArrayBuffer:
-		case Uint8ClampedArray:
-			input = new Uint8Array(input); // Fall-through
-		
+		case ArrayBuffer:    case Uint8ClampedArray:
 		case Uint8Array:     case Int8Array:
 		case Uint16Array:    case Int16Array:
 		case Uint32Array:    case Int32Array:
 		case BigUint64Array: case BigInt64Array:
 		case Float32Array:   case Float64Array:
-			bytes = new Uint8Array(input.buffer);
+			bytes = new Uint8Array(input.buffer || input);
 			size = uint64ToBytes(BigInt(bytes.length));
 			type = [
+				ArrayBuffer,  Uint8ClampedArray,
 				Uint8Array,   Uint16Array, Uint32Array, BigUint64Array,
 				Int8Array,    Int16Array,  Int32Array,  BigInt64Array,
 				Float32Array, Float64Array,
@@ -798,12 +796,12 @@ export function packValue(input){
 			input = "Invalid Date" === input.toString() ? input.toString() : input.toISOString();
 			input = utf8Decode(input);
 			size = BigInt(input.length);
-			return [29, ...uint64ToBytes(size), ...input];
+			return [31, ...uint64ToBytes(size), ...input];
 		
 		case String:
 			input = utf8Decode(input);
 			size = BigInt(input.length);
-			return [30, ...uint64ToBytes(size), ...input];
+			return [32, ...uint64ToBytes(size), ...input];
 		
 		case RegExp:
 			let flags = 0;
@@ -815,12 +813,12 @@ export function packValue(input){
 			if(input.sticky)     flags |= 1 << 5;
 			input = utf8Decode(input.source);
 			size  = uint64ToBytes(BigInt(input.length));
-			return [31, ...size, flags, ...input];
+			return [33, ...size, flags, ...input];
 		
 		default:
 			input = utf8Decode(JSON.stringify(input));
 			size = uint64ToBytes(BigInt(input.length));
-			return [32, ...size, ...input];
+			return [34, ...size, ...input];
 	}
 }
 
@@ -848,7 +846,7 @@ export function unpackValue(input){
 		case 7: return [1, -0];
 	}
 	// Single number (predetermined size)
-	if(type > 7 && type < 16 || 26 === type)
+	if(type > 7 && type < 16 || 28 === type)
 		switch(type){
 			case 8:  return [2, view.getUint8(0)];
 			case 9:  return [3, view.getUint16(0)];
@@ -858,28 +856,35 @@ export function unpackValue(input){
 			case 13: return [3, view.getInt16(0)];
 			case 14: return [5, view.getInt32(0)];
 			case 15: return [9, view.getBigInt64(0)];
-			case 26: return [9, view.getFloat64(0)];
+			case 28: return [9, view.getFloat64(0)];
 		}
 	
+	// ArrayBuffer
+	if(16 === type){
+		input = new Uint8Array(input.slice(9, 9 + size)).buffer;
+		return [9 + size, input];
+	}
+	
 	// Multiple numbers
-	if(type > 15 && type < 26){
+	if(type > 16 && type < 28){
 		const list = [
+			Uint8ClampedArray,
 			Uint8Array,   Uint16Array, Uint32Array, BigUint64Array,
 			Int8Array,    Int16Array,  Int32Array,  BigInt64Array,
 			Float32Array, Float64Array,
-		][type - 16];
-		input = new list(input.slice(9, 9 + (size * list.BYTES_PER_ELEMENT)).buffer);
-		return [9 + input.length, input];
+		][type - 17];
+		input = new list(input.slice(9, 9 + size).buffer);
+		return [9 + input.byteLength, input];
 	}
 	
 	// BigInt (variable-length)
-	if(27 === type || 28 === type){
+	if(29 === type || 30 === type){
 		input = [...input.subarray(9, 9 + size)].map(x => x.toString(16).padStart(2, "0"));
-		return [9 + size, BigInt("0x" + input.join("")) * (28 === type ? -1n : 1n)];
+		return [9 + size, BigInt("0x" + input.join("")) * (30 === type ? -1n : 1n)];
 	}
 	
 	// RegExp
-	if(31 === type){
+	if(33 === type){
 		const flags = view.getUint8(8);
 		let flagStr = "";
 		if(flags & 1)      flagStr += "g";
@@ -894,9 +899,9 @@ export function unpackValue(input){
 	// String-like data
 	input = utf8Encode(input.subarray(9, 9 + size));
 	switch(type){
-		case 29: return [9 + size, new Date(input)];
-		case 30: return [9 + size, input];
-		case 32: return [9 + size, JSON.parse(input)];
+		case 31: return [9 + size, new Date(input)];
+		case 32: return [9 + size, input];
+		case 34: return [9 + size, JSON.parse(input)];
 	}
 	
 	// Unknown/invalid type
