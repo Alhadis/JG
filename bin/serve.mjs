@@ -18,6 +18,7 @@ import {
 	tildify,
 	deindent as HTML,
 } from "alhadis.utils";
+import {useGracefulQuit} from "./ws.mjs";
 
 
 // Resolve CLI switches
@@ -164,12 +165,7 @@ console.log(`[PID: ${process.pid}] Serving files from ${tildify(root)} on port $
 noIndex   && console.log("--no-index passed: directory indexes will not be displayed");
 printPost && console.log("--print-post enabled: POST bodies will be echoed to stdout");
 trace     && console.log("--trace enabled: incoming requests will be echoed to stdout");
-
-process.stdin.setRawMode(true);
-process.stdin.on("data", data => (0x03 === data[0] || 0x04 === data[0]) && halt());
-process.on("beforeExit", () => process.stdin.setRawMode(false));
-process.on("SIGINT", halt);
-process.on("SIGTERM", halt);
+useGracefulQuit();
 
 
 /**

@@ -595,13 +595,22 @@ export class App extends Server{
  * @return {void}
  */
 export function useGracefulQuit(fn = null){
+	if(!process.stdin.isTTY) return;
 	const halt = () => {
 		if("function" === typeof fn) fn();
 		process.stdin.setRawMode(false);
 		process.exit(0);
 	};
-	process.stdin.setRawMode(true);
-	process.stdin.on("data", data => (0x03 === data[0] || 0x04 === data[0]) && halt());
+	process.on("SIGTTIN", () => {});
+	process.on("SIGTTOU", () => {});
+	try{ process.stdin.setRawMode(true); }
+	catch(e){ return; }
+	process.stdin.on("data", data => {
+		switch(data[0]){
+			case 0x03: case 0x04: halt(); break;
+			case 0x1A: process.kill(process.pid, "SIGTSTP");
+		}
+	});
 	process.on("beforeExit", () => process.stdin.setRawMode(false));
 	process.on("SIGINT", halt);
 	process.on("SIGTERM", halt);
