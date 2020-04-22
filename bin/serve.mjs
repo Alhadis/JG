@@ -169,19 +169,6 @@ useGracefulQuit();
 
 
 /**
- * Terminate process.
- *
- * @param {Number} [code=0] - Exit status to terminate with
- * @param {Boolean} [graceful=false] - Wait for server to shutdown(2) first
- * @return {void}
- */
-function halt(code = 0, graceful = false){
-	process.stdin.setRawMode(false);
-	graceful ? server.close(() => process.exit(code)) : process.exit(code);
-}
-
-
-/**
  * Derive a file's content-type from its file extension.
  *
  * @param {String} file
