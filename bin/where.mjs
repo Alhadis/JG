@@ -17,19 +17,22 @@ if(process.argv[1] === path || globalThis.$0 === path){
 		const {options, argv} = getOpts(process.argv.slice(2), {
 			"-d, --dir": "path",
 			"-q, --quiet": "",
+			"-s, --shell": "",
 		}, {
 			noMixedOrder: true,
 			noUndefined: true,
 			terminator: "--",
 		});
 		quiet = options.quiet;
-		const {dir = process.cwd()} = options;
+		const {dir = process.cwd(), shell} = options;
 		
 		let status = 0;
 		for(const arg of argv){
 			const path = await findModule(arg, dir);
 			null !== path
-				? quiet || process.stdout.write(path + "\n")
+				? quiet || shell
+					? printShellVariable(arg, path)
+					: process.stdout.write(path + "\n")
 				: status = 1;
 		}
 		process.exit(status);
@@ -81,4 +84,19 @@ export async function findNPMRoot(){
 	const {exec}   = await import("alhadis.utils");
 	const {stdout} = await exec("npm", ["root", "-g"]);
 	return findNPMRoot.cached = stdout.trim();
+}
+
+
+/**
+ * Write a POSIX-shell variable assignment to stdout.
+ *
+ * @param {String} name
+ * @param {String} value
+ * @return {void}
+ */
+export function printShellVariable(name, value){
+	name  = String(name).toLowerCase().replace(/\W+/g, "");
+	value = String(value).replace(/'/g, "'\\''");
+	if(/^\d/.test(name)) name = `_${name}`;
+	process.stdout.write(`${name}='${value}'\n`);
 }
