@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // <!DOCTYPE html><html><body><script type="module">
-import {isBrowser, bitmapToRGBA} from "../Labs/Utils/index.mjs";
+import {isBrowser, bitmapToRGBA} from "../../node_modules/alhadis.utils/index.mjs";
 
 const w = 25;
 const h = 25;
@@ -58,7 +58,7 @@ else{
 		const [r, g, b, a] = rgba.slice(i, i + 4);
 		if(i && !(i % w))
 			process.stdout.write("\n");
-		process.stdout.write(a ? `\x1B[48;2;${r};${g};${b}m.\x1B[0m` : ".");
+		process.stdout.write(a ? `\x1B[38;2;${r};${g};${b}m\x1B[7m.\x1B[0m` : ".");
 	}
 	process.stdout.write("\n");
 }
