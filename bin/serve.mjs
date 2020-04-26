@@ -106,10 +106,13 @@ const server = HTTP.createServer(async (request, response) => {
 		console.log(escape(await receive(request)));
 	
 	// Return an HTML wrapper for JS files loaded as root
-	if(wrapperPath && "/" === request.url.replace(/\?.*$/, "")){
+	const url = request.url.replace(/\?.*$/, "");
+	if(wrapperPath && ("/" === url || wrapperPath === path.join(root, url))){
 		const type = wrapperIsESM ? ' type="module"' : "";
-		const file = fs.readFileSync(wrapperPath, "utf8").replace(/^#![^\n]*/, "");
-		const html = HTML`
+		const file = fs.readFileSync(wrapperPath, "utf8").replace(/^#![^\n]*\n?/, "");
+		const html = /^\s*\/\/\s*<!DOCTYPE\s+html[^>]*>[^\n]+\n?/i.test(file)
+			? file.replace(/^\s*\/\/\s*/, "").replace(/\n\s*\/\/\s*(?=<\/script>)/i, "\n")
+			: HTML`
 			<!DOCTYPE html>
 			<html lang="en-AU">
 			<head>
