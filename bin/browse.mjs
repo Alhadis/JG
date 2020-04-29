@@ -159,11 +159,22 @@ export async function findChrome(unstable = false){
  * @return {Promise.<?String>}
  */
 export async function findEdge(){
-	const path = "C:\\Windows\\SystemApps\\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\\MicrosoftEdge.exe";
-	if(existsSync(path)) return path;
-	const cmd = "(Get-Command MicrosoftEdge).source";
-	const {stdout} = await exec("powershell.exe", ["-command", cmd], null, {windowsHide: true});
-	return stdout.trim() || null;
+	switch(process.platform){
+		case "darwin": {
+			const path = "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge";
+			const home = join(process.env.HOME || "/", path);
+			if(existsSync(home)) return home;
+			if(existsSync(path)) return path;
+			break;
+		}
+		case "win32": {
+			const path = "C:\\Windows\\SystemApps\\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\\MicrosoftEdge.exe";
+			if(existsSync(path)) return path;
+			const cmd = "(Get-Command MicrosoftEdge).source";
+			const {stdout} = await exec("powershell.exe", ["-command", cmd], null, {windowsHide: true});
+			return stdout.trim() || null;
+		}
+	}
 }
 
 
@@ -444,12 +455,21 @@ export async function openChrome(url){
  * @return {Promise.<ChildProcess>}
  */
 export async function openEdge(url){
-	if("win32" !== process.platform)
-		throw new Error("Edge only supported on Microsoft Windows");
-	return spawn("powershell.exe", ["-command", [
-		`(Start-Process -FilePath "microsoft-edge:${url}")`,
-		'(Wait-Process -Name "MicrosoftEdge" -ErrorAction SilentlyContinue)',
-	].join("; ")], {windowsHide: true, stdio: "inherit"});
+	switch(process.platform){
+		case "darwin":
+			const path = await findEdge();
+			if(!path) throw new Error("Could not locate Edge on host system");
+			return spawn(path, [url], {stdio: "inherit"});
+		
+		case "win32":
+			return spawn("powershell.exe", ["-command", [
+				`(Start-Process -FilePath "microsoft-edge:${url}")`,
+				'(Wait-Process -Name "MicrosoftEdge" -ErrorAction SilentlyContinue)',
+			].join("; ")], {windowsHide: true, stdio: "inherit"});
+		
+		default:
+			throw new Error("Microsoft Edge only supported on Windows and macOS");
+	}
 }
 
 
