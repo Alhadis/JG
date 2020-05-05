@@ -342,75 +342,6 @@ export class Server extends HTTP.Server{
 
 
 /**
- * Determine if an incoming request is attempting a WebSocket handshake.
- * @param {IncomingMessage} request
- * @return {Boolean}
- */
-export function isHandshake(request){
-	return request
-		&& request.httpVersion >= 1.1
-		&& request.headers
-		&& request.headers["sec-websocket-key"]
-		&& "websocket" === request.headers.upgrade
-		&& "Upgrade"   === request.headers.connection
-		&& "GET"       === request.method;
-}
-
-
-/**
- * Decode a byte-stream as a sequence of WebSocket frames.
- * @param {Number[]} data
- * @return {{frames: WSFrame[], trailer: Number[]}}
- */
-export function decode(data){
-	const frames = [];
-	let frame;
-	do{
-		frame = wsDecodeFrame(data);
-		if(BigInt(frame.payload.length) < frame.length)
-			break;
-		data = frame.trailer;
-		frames.push(frame);
-	} while(data.length);
-	for(const frame of frames)
-		frame.trailer = [];
-	return {frames, trailer: data};
-}
-
-
-/**
- * Encode a message as a sequence of data frames.
- * @param {FrameData} data
- * @param {Number} [maxSize=Infinity]
- * @return {WSFrame[]}
- */
-export function encode(data, maxSize = Infinity){
-	let opcode = 0x02;
-	if("string" === typeof data){
-		data = utf8Decode(data);
-		opcode = 0x01;
-	}
-	else data = [...data];
-	const frames = [];
-	do{
-		frames.push(wsEncodeFrame({
-			payload: data.splice(0, maxSize),
-			isFinal: !data.length,
-			opcode,
-		}));
-		opcode = 0x00;
-	} while(data.length > 0);
-	return frames;
-}
-
-
-/**
- * Content to encode for a data frame.
- * @typedef {String|Uint8Array|Buffer} FrameData
- */
-
-
-/**
  * Helper class to facilitate running single-file WebSocket apps.
  * @class
  */
@@ -590,104 +521,70 @@ export class App extends Server{
 
 
 /**
- * Hide the ^C echoed to terminal when terminating the process.
- * @param {Function} [fn=null]
- * @return {void}
+ * Decode a byte-stream as a sequence of WebSocket frames.
+ * @param {Number[]} data
+ * @return {{frames: WSFrame[], trailer: Number[]}}
  */
-export function useGracefulQuit(fn = null){
-	if(!process.stdin.isTTY) return;
-	const halt = () => {
-		if("function" === typeof fn) fn();
-		process.stdin.setRawMode(false);
-		process.exit(0);
-	};
-	process.on("SIGTTIN", () => {});
-	process.on("SIGTTOU", () => {});
-	try{ process.stdin.setRawMode(true); }
-	catch(e){ return; }
-	process.stdin.on("data", data => {
-		switch(data[0]){
-			case 0x03: case 0x04: halt(); break;
-			case 0x1A: process.kill(process.pid, "SIGTSTP");
-		}
-	});
-	process.on("beforeExit", () => process.stdin.setRawMode(false));
-	process.on("SIGINT", halt);
-	process.on("SIGTERM", halt);
+export function decode(data){
+	const frames = [];
+	let frame;
+	do{
+		frame = wsDecodeFrame(data);
+		if(BigInt(frame.payload.length) < frame.length)
+			break;
+		data = frame.trailer;
+		frames.push(frame);
+	} while(data.length);
+	for(const frame of frames)
+		frame.trailer = [];
+	return {frames, trailer: data};
 }
 
 
 /**
- * Bind an object's methods to a {@link Proxy} to quicken access to {@link App}
- * and {@link WebSocket} instance methods (without extending the object itself).
- *
- * @param {Object} obj
- * @param {WebSocket|Server} context
- * @return {void}
- * @internal
+ * Encode a message as a sequence of data frames.
+ * @param {FrameData} data
+ * @param {Number} [maxSize=Infinity]
+ * @return {WSFrame[]}
  */
-export function proxify(obj, context){
-	const proxy = new Proxy(obj, {
-		get(target, property){
-			return Reflect.has(obj, property)
-				? Reflect.get(obj, property)
-				: Reflect.get(context, property);
-		},
-	});
-	replaceMethods(obj, (name, fn) => fn.bind(proxy));
-}
-
-
-/**
- * Monkey-patch the configurable methods of an object.
- * @param {Object} obj
- * @param {MethodReplacer} cb
- * @return {Object} Reference to the subject
- * @internal
- */
-export function replaceMethods(obj, cb){
-	const props = Object.getOwnPropertyDescriptors(obj);
-	for(const [name, {value, configurable, enumerable}] of Object.entries(props)){
-		if(!configurable || "function" !== typeof value) continue;
-		Object.defineProperty(obj, name, {
-			configurable: true,
-			writable: false,
-			enumerable,
-			value: cb(name, value),
-		});
+export function encode(data, maxSize = Infinity){
+	let opcode = 0x02;
+	if("string" === typeof data){
+		data = utf8Decode(data);
+		opcode = 0x01;
 	}
-	return obj;
+	else data = [...data];
+	const frames = [];
+	do{
+		frames.push(wsEncodeFrame({
+			payload: data.splice(0, maxSize),
+			isFinal: !data.length,
+			opcode,
+		}));
+		opcode = 0x00;
+	} while(data.length > 0);
+	return frames;
 }
+
+/**
+ * Content to encode for a data frame.
+ * @typedef {String|Uint8Array|Buffer} FrameData
+ */
 
 
 /**
- * Replace an endpoint's methods with ones to turn function-calls into WS messages.
- * @param {Object} obj
- * @param {WebSocket|Server} sender
- * @return {void}
- * @internal
+ * Determine if an incoming request is attempting a WebSocket handshake.
+ * @param {IncomingMessage} request
+ * @return {Boolean}
  */
-export function sockify(obj, sender){
-	let callID = 0;
-	const isServer = "function" === typeof App && sender instanceof App;
-	replaceMethods(obj, name => async (...args) => {
-		const id = callID++;
-		args.unshift(true, id, name);
-		sender.send(pack(...args));
-		const [on, off, msgEvent] = isServer
-			? ["on", "off", "ws:message"]
-			: ["addEventListener", "removeEventListener", "message"];
-		return new Promise(resolve => {
-			const fn = (ws, args) => {
-				args = unpack(isServer ? args : ws.data);
-				if(id === args[0] && name === args[1]){
-					sender[off](msgEvent, fn);
-					resolve(args.slice(2));
-				}
-			};
-			sender[on](msgEvent, fn);
-		}).catch(e => console.error(e));
-	});
+export function isHandshake(request){
+	return request
+		&& request.httpVersion >= 1.1
+		&& request.headers
+		&& request.headers["sec-websocket-key"]
+		&& "websocket" === request.headers.upgrade
+		&& "Upgrade"   === request.headers.connection
+		&& "GET"       === request.method;
 }
 
 
@@ -702,29 +599,6 @@ export function pack(...args){
 		result.push(...packValue(arg));
 	result.unshift(...uint64ToBytes(BigInt(args.length)));
 	return Uint8Array.from(result);
-}
-
-
-/**
- * Decode a packed list of encoded arguments.
- * @param {Number[]|Uint8Array}
- * @return {Array}
- */
-export function unpack(bytes){
-	if(bytes instanceof ArrayBuffer)
-		bytes = new Uint8Array(bytes);
-	else bytes = Uint8Array.from(bytes);
-	if(bytes.length < 8) return []; // TODO: Remove once varints are used
-	const view = new DataView(bytes.buffer);
-	const size = Number(view.getBigUint64(0));
-	let offset = 8;
-	const args = new Array(size);
-	for(let i = 0; offset < bytes.byteLength && i < size;){
-		const [size, value] = unpackValue(bytes.subarray(offset));
-		offset += size;
-		args[i++] = value;
-	}
-	return args;
 }
 
 
@@ -833,6 +707,103 @@ export function packValue(input){
 
 
 /**
+ * Bind an object's methods to a {@link Proxy} to quicken access to {@link App}
+ * and {@link WebSocket} instance methods (without extending the object itself).
+ *
+ * @param {Object} obj
+ * @param {WebSocket|Server} context
+ * @return {void}
+ * @internal
+ */
+export function proxify(obj, context){
+	const proxy = new Proxy(obj, {
+		get(target, property){
+			return Reflect.has(obj, property)
+				? Reflect.get(obj, property)
+				: Reflect.get(context, property);
+		},
+	});
+	replaceMethods(obj, (name, fn) => fn.bind(proxy));
+}
+
+
+/**
+ * Monkey-patch the configurable methods of an object.
+ * @param {Object} obj
+ * @param {MethodReplacer} cb
+ * @return {Object} Reference to the subject
+ * @internal
+ */
+export function replaceMethods(obj, cb){
+	const props = Object.getOwnPropertyDescriptors(obj);
+	for(const [name, {value, configurable, enumerable}] of Object.entries(props)){
+		if(!configurable || "function" !== typeof value) continue;
+		Object.defineProperty(obj, name, {
+			configurable: true,
+			writable: false,
+			enumerable,
+			value: cb(name, value),
+		});
+	}
+	return obj;
+}
+
+
+/**
+ * Replace an endpoint's methods with ones to turn function-calls into WS messages.
+ * @param {Object} obj
+ * @param {WebSocket|Server} sender
+ * @return {void}
+ * @internal
+ */
+export function sockify(obj, sender){
+	let callID = 0;
+	const isServer = "function" === typeof App && sender instanceof App;
+	replaceMethods(obj, name => async (...args) => {
+		const id = callID++;
+		args.unshift(true, id, name);
+		sender.send(pack(...args));
+		const [on, off, msgEvent] = isServer
+			? ["on", "off", "ws:message"]
+			: ["addEventListener", "removeEventListener", "message"];
+		return new Promise(resolve => {
+			const fn = (ws, args) => {
+				args = unpack(isServer ? args : ws.data);
+				if(id === args[0] && name === args[1]){
+					sender[off](msgEvent, fn);
+					resolve(args.slice(2));
+				}
+			};
+			sender[on](msgEvent, fn);
+		}).catch(e => console.error(e));
+	});
+}
+
+
+/**
+ * Decode a packed list of encoded arguments.
+ * @param {Number[]|Uint8Array}
+ * @return {Array}
+ */
+export function unpack(bytes){
+	if(bytes instanceof ArrayBuffer)
+		bytes = new Uint8Array(bytes);
+	else bytes = Uint8Array.from(bytes);
+	if(bytes.length < 8) return []; // TODO: Remove once varints are used
+	const view = new DataView(bytes.buffer);
+	const size = Number(view.getBigUint64(0));
+	let offset = 8;
+	const args = new Array(size);
+	for(let i = 0; offset < bytes.byteLength && i < size;){
+		const [size, value] = unpackValue(bytes.subarray(offset));
+		offset += size;
+		args[i++] = value;
+	}
+	return args;
+}
+
+
+/**
  * Decode the binary representation of a single value.
  * @param {Uint8Array} bytes
  * @return {Array.<BigInt, *>}
@@ -915,4 +886,32 @@ export function unpackValue(input){
 	
 	// Unknown/invalid type
 	throw new TypeError(`Unrecognised type identifier: 0x${type.toString(16).toUpperCase()}`);
+}
+
+
+/**
+ * Hide the ^C echoed to terminal when terminating the process.
+ * @param {Function} [fn=null]
+ * @return {void}
+ */
+export function useGracefulQuit(fn = null){
+	if(!process.stdin.isTTY) return;
+	const halt = () => {
+		if("function" === typeof fn) fn();
+		process.stdin.setRawMode(false);
+		process.exit(0);
+	};
+	process.on("SIGTTIN", () => {});
+	process.on("SIGTTOU", () => {});
+	try{ process.stdin.setRawMode(true); }
+	catch(e){ return; }
+	process.stdin.on("data", data => {
+		switch(data[0]){
+			case 0x03: case 0x04: halt(); break;
+			case 0x1A: process.kill(process.pid, "SIGTSTP");
+		}
+	});
+	process.on("beforeExit", () => process.stdin.setRawMode(false));
+	process.on("SIGINT", halt);
+	process.on("SIGTERM", halt);
 }
