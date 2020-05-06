@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import HTTP from "http";
+import net from "net";
 import {resolve} from "path";
+import {randomBytes} from "crypto";
 import {readFileSync} from "fs";
 import EventEmitter from "events";
 import {fileURLToPath} from "url";
@@ -9,6 +11,7 @@ import getOpts from "get-options";
 import {
 	clamp,
 	deindent as HTML,
+	bytesToUint32,
 	uint64ToBytes,
 	utf8Decode,
 	utf8Encode,
@@ -63,6 +66,10 @@ export class Channel extends EventEmitter{
 		super();
 		this.socket = socket;
 		this.socket.on("data", this.readBytes.bind(this));
+		this.socket.on("close", hadError => {
+			if(this.#closed) return;
+			this.emit("ws:close", hadError ? 1011 : 1006);
+		});
 	}
 	
 	
@@ -342,6 +349,148 @@ export class Server extends HTTP.Server{
 
 
 /**
+ * Headless client connection to a WebSocket server.
+ * @class
+ */
+export class Client extends EventEmitter{
+	#redirects = 0;
+	#handshake = null;
+	logRedirects = false;
+	maxRedirects = 30;
+	
+	
+	/**
+	 * Begin a connection with a WebSocket server.
+	 *
+	 * @example new Client("ws://localhost:1338");
+	 * @param {String|URL} url
+	 * @constructor
+	 */
+	constructor(url){
+		super();
+		this.sendHandshake(url);
+		this.openPromise = new Promise((resolve, reject) => {
+			this.once("ws:open",  () => resolve(this.off("ws:close", reject)));
+			this.once("ws:close", () => resolve(this.off("ws:open",  resolve)));
+		});
+	}
+	
+	
+	/**
+	 * End the WebSocket session.
+	 *
+	 * @see {@link Channel#close}
+	 * @param {Number} [code=1006]
+	 * @param {String} [reason=""]
+	 * @return {Promise<void>}
+	 */
+	async close(...args){
+		if(!this.channel || this.channel.closed) return;
+		if(1 === args.length && "string" === typeof args[0])
+			args.unshift(1006);
+		const [code = 1006, reason = ""] = args;
+		return this.channel.close(code, reason);
+	}
+	
+	
+	/**
+	 * Send arbitrary data to the server.
+	 *
+	 * @param {FrameData|WSFrame[]} data - Message to transmit
+	 * @param {Boolean} [raw=false] - Treat input as pre-encoded frames
+	 * @return {void}
+	 */
+	send(...args){
+		if(this.channel && !this.channel.closed)
+			this.channel.send(...args);
+	}
+	
+	
+	/**
+	 * Send the HTTP handshake request to the server.
+	 * @param {String|URL} url
+	 * @internal
+	 */
+	sendHandshake(url){
+		this.key = randomBytes(16).toString("base64");
+		this.url = new URL(url);
+		this.url.protocol = "http:";
+		const req = this.#handshake = HTTP.get(this.url, {
+			clientConnection: opts => net.connect({...opts, path: opts.socketPath}),
+			headers: {
+				"sec-websocket-version": 13,
+				"sec-websocket-key": this.key,
+				"cache-control": "no-cache",
+				pragma: "no-cache",
+				upgrade: "websocket",
+				connection: "Upgrade",
+			},
+		});
+		req.on("response", this.onResponse.bind(this));
+		req.on("upgrade",  this.onUpgrade.bind(this));
+	}
+	
+	
+	/**
+	 * Validate the server's handshake response.
+	 * @param {HTTP.IncomingMessage} response
+	 * @return {Boolean}
+	 * @internal
+	 */
+	confirmHandshake(response){
+		const {headers} = response;
+		const acceptKey = headers["sec-websocket-accept"];
+		return 101 === response.statusCode
+			&& response.httpVersion >= 1.1
+			&& "websocket" === headers.upgrade
+			&& "Upgrade"   === headers.connection
+			&& acceptKey   === wsHandshake(this.key);
+	}
+	
+	
+	/**
+	 * Handle a server's response to a handshake request.
+	 * @param {HTTP.IncomingMessage} response
+	 * @internal
+	 */
+	onResponse(response){
+		const {headers, statusCode, statusMessage} = response;
+		if(headers.location && statusCode >= 300 && statusCode < 400 && this.maxRedirects > 0){
+			if(++this.#redirects > this.maxRedirects)
+				this.close("Too many redirects");
+			else{
+				this.logRedirects && console.log(`Redirecting: \x1B[4m${location}\x1B[24m`);
+				this.#handshake?.removeAllListeners().destroy();
+				this.sendHandshake(location);
+			}
+		}
+		else this.confirmHandshake(response)
+			? this.upgrade(response)
+			: this.close(1005, `Unexpected response: ${statusCode} ${statusMessage}`);
+	}
+	
+	
+	/**
+	 * Construct the actual {@link Channel} instance that does the talking.
+	 *
+	 * @emits ws:open
+	 * @param {HTTP.IncomingMessage} response
+	 * @param {net.Socket} socket
+	 * @param {Buffer} head
+	 * @internal
+	 */
+	onUpgrade(response, socket, head){
+		this.#redirects = 0;
+		socket.setTimeout(0).setNoDelay();
+		this.channel = new Channel(socket);
+		this.channel.on("ws:message", (...args) => this.emit("ws:message", ...args));
+		this.emit("ws:open");
+		head?.length && this.channel.send(head);
+	}
+}
+
+
+/**
  * Helper class to facilitate running single-file WebSocket apps.
  * @class
  */
@@ -559,6 +708,7 @@ export function encode(data, maxSize = Infinity){
 		frames.push(wsEncodeFrame({
 			payload: data.splice(0, maxSize),
 			isFinal: !data.length,
+			mask: bytesToUint32(randomBytes(4)),
 			opcode,
 		}));
 		opcode = 0x00;
@@ -569,6 +719,11 @@ export function encode(data, maxSize = Infinity){
 /**
  * Content to encode for a data frame.
  * @typedef {String|Uint8Array|Buffer} FrameData
+ */
+
+/**
+ * A masking key for encrypting payload data, or a function that returns such.
+ * @typedef {Number|Function():Number} MaskSource
  */
 
 
