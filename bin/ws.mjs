@@ -491,6 +491,71 @@ export class Client extends EventEmitter{
 
 
 /**
+ * A WebSocket client utilising the JSON-RPC protocol.
+ * @see {@link https://www.jsonrpc.org/specification}
+ * @class
+ */
+export class RPCSession extends Client{
+	#nextID = 0;
+	version = "2.0";
+	
+	/**
+	 * Wait for a server notification with the given ID.
+	 *
+	 * @example await rpc.waitFor("Page.loadEventFired");
+	 * @param {String} notification - Event ID to wait for
+	 * @return {Promise<Object>}
+	 */
+	async waitFor(notification){
+		return new Promise(resolve => {
+			const fn = msg => {
+				msg = JSON.parse(msg);
+				if(notification === msg.method){
+					this.off("ws:message", fn);
+					resolve(msg);
+				}
+			};
+			this.on("ws:message", fn);
+		});
+	}
+	
+	
+	/**
+	 * Send an RPC request to the server.
+	 *
+	 * @example <caption>Using the Chrome DevTools protocol</caption>
+	 * await rpc.sendCmd("Target.getTargets") => {
+	 *    targetInfos: [{
+	 *        attached: true,
+	 *        targetId: "55990DFFD4E6E68EA85BA0332CE6D55D",
+	 *        title:    "about:blank",
+	 *        url:      "about:blank",
+	 *        type:     "page",
+	 *    }],
+	 * };
+	 * @param {String} method - Name of RPC method to execute
+	 * @param {?Object|Array} [params]
+	 * @return {Promise<Object>}
+	 */
+	async sendCmd(method, params){
+		if(!this.channel) throw new Error("No channel");
+		const id = ++this.#nextID;
+		const jsonrpc = this.version || undefined;
+		this.send(JSON.stringify({jsonrpc, id, method, params}));
+		return new Promise((resolve, reject) => {
+			const fn = msg => {
+				msg = JSON.parse(msg);
+				if(id !== msg.id) return;
+				this.off("ws:message", fn);
+				msg.error ? reject(msg.error) : resolve(msg.result);
+			};
+			this.on("ws:message", fn);
+		});
+	}
+}
+
+
+/**
  * Helper class to facilitate running single-file WebSocket apps.
  * @class
  */
