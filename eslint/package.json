@@ -1,6 +1,6 @@
 {
 	"name": "@alhadis/eslint-config",
-	"version": "v2.3.1",
+	"version": "v2.3.2",
 	"description": "Shareable version of my ESLint config.",
 	"repository": "https://github.com/Alhadis/JG/tree/master/eslint",
 	"license": "ISC",
@@ -8,6 +8,6 @@
 	"keywords": ["eslint", "eslintconfig"],
 	"scripts": {"test": "eslint ."},
 	"dependencies": {"eslint-plugin-import": ">=2.20.2"},
-	"peerDependencies": {"eslint": ">=v7.0.0"},
+	"peerDependencies": {"eslint": ">=v7.1.0"},
 	"publishConfig": {"access": "public"}
 }

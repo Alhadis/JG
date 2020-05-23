@@ -144,6 +144,7 @@
 		"no-ex-assign": 0,
 		"no-import-assign": "error",
 		"no-iterator": "error",
+		"no-loss-of-precision": "error",
 		"no-new-require": "error",
 		"no-return-await": "error",
 		"no-self-compare": "error",
