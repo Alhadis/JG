@@ -9,9 +9,9 @@
 	"engines": {"node": ">=13.2.0"},
 	"dependencies": {
 		"alhadis.utils": "latest",
-		"babel-eslint": "^10.0.3",
-		"eslint": "^7.1.0",
-		"eslint-plugin-import": "^2.20.2",
+		"babel-eslint": "^10.1.0",
+		"eslint": "^7.5.0",
+		"eslint-plugin-import": "^2.22.0",
 		"get-options": "^1.2.0"
 	}
 }

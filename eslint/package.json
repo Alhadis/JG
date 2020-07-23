@@ -7,7 +7,7 @@
 	"type": "commonjs",
 	"keywords": ["eslint", "eslintconfig"],
 	"scripts": {"test": "eslint ."},
-	"dependencies": {"eslint-plugin-import": ">=2.20.2"},
-	"peerDependencies": {"eslint": ">=v7.1.0"},
+	"dependencies": {"eslint-plugin-import": ">=2.22.0"},
+	"peerDependencies": {"eslint": ">=v7.4.0"},
 	"publishConfig": {"access": "public"}
 }
