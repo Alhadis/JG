@@ -92,6 +92,7 @@
 			"error",
 			{
 				"overrides": {
+					"await":   {"after": false},
 					"if":      {"after": false},
 					"do":      {"after": false},
 					"else":    {"after": false},
