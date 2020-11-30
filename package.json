@@ -5,7 +5,7 @@
 	"license": "ISC",
 	"type": "module",
 	"bin": {"jg": "index.mjs"},
-	"man": ["man/man5/*"],
+	"man": ["man/man5/jg-pack.5"],
 	"engines": {"node": ">=13.2.0"},
 	"dependencies": {
 		"alhadis.utils": "latest",
