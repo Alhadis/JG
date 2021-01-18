@@ -111,7 +111,9 @@ const server = HTTP.createServer(async (request, response) => {
 		const type = wrapperIsESM ? ' type="module"' : "";
 		const file = fs.readFileSync(wrapperPath, "utf8").replace(/^#![^\n]*\n?/, "");
 		const html = /^\s*\/\/\s*<!DOCTYPE\s+html[^>]*>[^\n]+\n?/i.test(file)
-			? file.replace(/^\s*\/\/\s*/, "").replace(/\n\s*\/\/\s*(?=<\/script>)/i, "\n")
+			? file.replace(/^\s*\/{2,}bin\/sh[ \t][^\n]*\n?/, "")
+				.replace(/^\s*\/\/\s*/, "")
+				.replace(/\n\s*\/\/\s*(?=<\/script>)/i, "\n")
 			: HTML`
 			<!DOCTYPE html>
 			<html lang="en-AU">
