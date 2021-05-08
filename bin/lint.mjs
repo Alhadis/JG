@@ -20,6 +20,8 @@ const CS_ENGINES = ["coffee"];
 const path = fileURLToPath(import.meta.url);
 if(process.argv[1] === path || globalThis.$0 === path){
 	const {options, argv} = getOpts(process.argv.slice(2), {
+		"-a, --atom": "",
+		"-b, --babel": "",
 		"-j, --js": "",
 		"-t, --ts": "",
 		"-C, --ignore-config": "",
@@ -150,6 +152,7 @@ export async function run(cmd, args, options = {}){
  */
 export async function lintJavaScript(files, options){
 	const args = ["--ext", "cjs,mjs,js", "--", ...files];
+	const base = options.atom ? "/atom" : options.babel ? "/babel" : "";
 	let linked = false;
 	let stats = null;
 	
@@ -165,14 +168,14 @@ export async function lintJavaScript(files, options){
 	
 	// Ignore whatever ESLint configs are in the working directory
 	if(options.ignoreConfig){
-		args.unshift("--config", getPath(".eslintrc.json"));
+		args.unshift("--config", getPath("eslint" + base));
 		args.unshift("--resolve-plugins-relative-to", getPath("."));
 		delete options.ignoreConfig;
 	}
 	
 	// Otherwise, test if ESLint can find a config file
 	else if(2 === await run("eslint", ["--print-config", "-"], {...options, stdio: "ignore"})){
-		const configFile = getPath(".eslintrc.json");
+		const configFile = getPath("eslint" + base);
 		+process.env.DEBUG && console.log(`Can't find config. Using ${configFile}`);
 		args.unshift("--config", configFile);
 	}
