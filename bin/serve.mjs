@@ -265,7 +265,7 @@ function getContentType(file){
 	if(/\.([-\w]+)$/.test(file)){
 		const type = RegExp.lastParen.toLowerCase();
 		return binary[type]
-			? `${binary[type]}; charset=binary`
+			? `${binary[type]}`
 			: `${text[type] || defaultType}; charset=UTF-8`;
 	}
 	return defaultType + "; charset=UTF-8";
