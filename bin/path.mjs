@@ -60,12 +60,14 @@ export default function getPath(filename){
 	if(null !== match)
 		return resolve(join(ROOT_DIR, "jsdoc", "config.json"));
 	
-	const result = filename
-		? resolve(join(ROOT_DIR, filename))
-		: resolve(ROOT_DIR);
+	// No argument: Installation directory
+	if(!filename)
+		return resolve(ROOT_DIR);
 	
-	if(existsSync(result))
-		return result;
+	for(let path of [filename, `bin/${filename}`])
+		if(existsSync(path = resolve(join(ROOT_DIR, path)))
+		|| existsSync(path += ".mjs"))
+			return path;
 	
 	process.stderr.write(`No such file: ${filename}\n`);
 	return null;
