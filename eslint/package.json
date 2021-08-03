@@ -1,6 +1,6 @@
 {
 	"name": "@alhadis/eslint-config",
-	"version": "v2.3.2",
+	"version": "v2.3.3",
 	"description": "Shareable version of my ESLint config.",
 	"repository": "https://github.com/Alhadis/JG/tree/master/eslint",
 	"license": "ISC",
