@@ -37,7 +37,7 @@
 			"error",
 			"always",
 			{
-				"ignorePattern": "camelCased|camelCase|gropdf|macOS|xterm",
+				"ignorePattern": "gropdf|illumos|xterm|[a-z]+[A-Z]|[-\\w]+(?=\\(.*?\\))|v\\d|(?:vi(?:m[<=>]?\\d+|m?)|ex)(?=\\s*:)",
 				"ignoreInlineComments": true,
 				"ignoreConsecutiveComments": true
 			}
