@@ -1,0 +1,2 @@
+# Exclude stuff I didn't write from project language statistics
+/etc/profiles/* linguist-vendored

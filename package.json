@@ -7,6 +7,7 @@
 	"bin": {"jg": "index.mjs"},
 	"man": ["man/man5/jg-pack.5"],
 	"engines": {"node": ">=13.2.0"},
+	"eslintIgnore": ["**/firefox-headless.js"],
 	"dependencies": {
 		"alhadis.utils": "latest",
 		"@babel/eslint-parser": "^7.15.0",

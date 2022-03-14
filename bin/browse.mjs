@@ -7,7 +7,7 @@
  */
 
 import {basename, dirname, join, resolve} from "path";
-import {existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync} from "fs";
+import {copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync} from "fs";
 import {exec, which} from "alhadis.utils";
 import {spawn} from "child_process";
 import {fileURLToPath} from "url";
@@ -17,6 +17,7 @@ import getOpts from "get-options";
 
 // Run if executed directly
 const path = fileURLToPath(import.meta.url);
+const root = resolve(dirname(path), "..");
 (process.argv[1] === path || globalThis.$0 === path) && (async () => {
 	const {options, argv} = getOpts(process.argv.slice(2), {
 		"-a, --auto":     "",
@@ -476,7 +477,7 @@ export async function openEdge(url){
 /**
  * Open a page in Firefox.
  *
- * @see {@link https://developer.mozilla.org/en-US/docs/Command_Line_Options}
+ * @see {@link https://web.archive.org/web/20210530092017/https://developer.mozilla.org/en-US/docs/Mozilla/Command_Line_Options}
  * @see {@link https://hacks.mozilla.org/2017/12/using-headless-mode-in-firefox/}
  * @see {@link https://wiki.mozilla.org/Platform/Integration/InjectEject/Launcher_Process/}
  * @param {String|URL} url
@@ -488,24 +489,29 @@ export async function openFirefox(url){
 	const profile = join(tmpdir(), "jg-browse-firefox");
 	const flags = [
 		"-headless",
+		"-marionette",
 		"-start-debugger-server", 6000,
+		"-new-instance",
+		"-allow-downgrade",
 		"-profile", profile,
 		"-no-remote",
 		"-wait-for-browser",
 	];
-	existsSync(profile) || mkdirSync(profile);
-	writeFileSync(join(profile, "prefs.js"), Object.entries({
-		"browser.bookmarks.restore_default_bookmarks": false,
-		"browser.shell.checkDefaultBrowser": false,
-		"browser.tabs.remote.autostart": false,
-		"browser.tabs.remote.autostart.2": false,
-		"dom.disable_open_during_load": false,
-		"dom.max_script_run_time": 0,
-		"dom.min_background_timeout_value": 10,
-		"extensions.autoDisableScopes": 0,
-		"extensions.enabledScopes": 15,
-	}).map(x => `user_pref("${x[0]}", ${JSON.stringify(x[1])});`).join("\n"));
-	
+	if(!existsSync(profile)){
+		const name = basename(profile);
+		+process.env.DEBUG && console.info(`Creating profile "${name}" at ${profile}`);
+		const {code, stdout, stderr} = await exec(path, [
+			"-headless",
+			"-new-instance",
+			"-no-remote",
+			"-CreateProfile", name + " " + profile]);
+		console.log({code, stdout, stderr});
+		if(code){
+			stderr && console.error(stderr);
+			throw new Error(`Firefox exited with code ${code}`);
+		}
+	}
+	copyFileSync(join(root, ..."etc/profiles/firefox-headless.js".split("/")), join(profile, "user.js"));
 	const env = {...process.env, MOZ_DEBUG_BROWSER_PAUSE: 0};
 	return spawn(path, [...flags, url], {env, windowsHide: true, stdio: "inherit"});
 }
