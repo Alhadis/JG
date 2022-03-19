@@ -131,6 +131,24 @@ const server = HTTP.createServer(async (request, response) => {
 		return response.end();
 	}
 	
+	// Squelch gripes over a "missing" favicon by serving a blank ICO
+	// FIXME: Favicons that exist in ICO format are loaded twice
+	if("/favicon.ico" === url && !(await getFileForURL(request.url, true)).file){
+		const bytes = Buffer.from(`
+			AAABAAEAEBACAAEAAQCwAAAAFgAAACgAAAAQAAAAIAAAAAEAAQAAAAAAQAAAAAAAAAAAAAA
+			AAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+			AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//wAA//8AAP//AAD//wAA//8AAP//AAD//
+			wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA
+		`, "base64");
+		response.writeHead(200, {
+			"Cache-Control": "no-cache",
+			"Content-Type": "image/x-icon",
+			"Content-Length": bytes.byteLength,
+		});
+		response.write(bytes);
+		return response.end();
+	}
+	
 	const {file, redirect, stats, html} = await getFileForURL(request.url);
 
 	// Arbitrary HTML
@@ -282,10 +300,11 @@ function getContentType(file){
  *    redirect: "http://go.to/this.instead",
  *    stats: fs.Stats {…},
  * }
- * @param {String} input
+ * @param {String} input - Pathname of requested resource
+ * @param {Boolean} [silent=false] - Don't gripe about nonexistent files
  * @return {Object}
  */
-async function getFileForURL(input){
+async function getFileForURL(input, silent = false){
 	input = input
 		.replace(/^\/+/, "")
 		.replace(/\?.+$/, "");
@@ -300,7 +319,7 @@ async function getFileForURL(input){
 		}
 	
 	if(!fs.existsSync(file)){
-		console.log("No such file: " + file);
+		silent || console.log("No such file: " + file);
 		return {};
 	}
 
