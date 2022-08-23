@@ -2,7 +2,7 @@
 	"extends": "eslint:recommended",
 	"env": {
 		"browser": true,
-		"es2021": true,
+		"es2022": true,
 		"mocha": true,
 		"node": true
 	},
@@ -146,6 +146,11 @@
 		"no-import-assign": "error",
 		"no-iterator": "error",
 		"no-loss-of-precision": "error",
+		"no-nonoctal-decimal-escape": "error",
+		"no-unsafe-optional-chaining": "error",
+		"no-unused-private-class-members": "error",
+		"no-constant-binary-expression": "error",
+		"prefer-object-has-own": "error",
 		"no-new-require": "error",
 		"no-return-await": "error",
 		"no-self-compare": "error",

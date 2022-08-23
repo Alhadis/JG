@@ -10,9 +10,9 @@
 	"eslintIgnore": ["**/firefox-headless.js"],
 	"dependencies": {
 		"alhadis.utils": "latest",
-		"@babel/eslint-parser": "^7.15.0",
-		"eslint": "^7.32.0",
-		"eslint-plugin-import": "^2.24.2",
+		"@babel/eslint-parser": "^7.18.9",
+		"eslint": "^8.22.0",
+		"eslint-plugin-import": "^2.26.0",
 		"get-options": "^1.2.0"
 	}
 }
