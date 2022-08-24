@@ -1,16 +1,13 @@
 {
 	"name": "@alhadis/eslint-config",
-	"version": "v2.4.0",
+	"version": "v2.4.1",
 	"description": "Shareable version of my ESLint config.",
 	"repository": "https://github.com/Alhadis/JG/tree/master/eslint",
 	"license": "ISC",
 	"type": "commonjs",
 	"keywords": ["eslint", "eslintconfig"],
 	"scripts": {"test": "eslint ."},
-	"dependencies": {
-		"@babel/eslint-parser": ">=7.18.9",
-		"eslint-plugin-import": ">=2.26.0"
-	},
+	"dependencies": {"eslint-plugin-import": ">=2.26.0"},
 	"peerDependencies": {"eslint": ">=v8.22.0"},
 	"publishConfig": {"access": "public"}
 }
