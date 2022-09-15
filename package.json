@@ -11,6 +11,8 @@
 	"dependencies": {
 		"alhadis.utils": "latest",
 		"@babel/eslint-parser": "^7.18.9",
+		"@typescript-eslint/eslint-plugin": "^5.37.0",
+		"@typescript-eslint/parser": "^5.37.0",
 		"eslint": "^8.22.0",
 		"eslint-plugin-import": "^2.26.0",
 		"get-options": "^1.2.0"

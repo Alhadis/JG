@@ -1,0 +1,104 @@
+{
+	"extends": "@alhadis/eslint-config/typescript",
+	"rules": {
+		"@typescript-eslint/await-thenable": "error",
+		"@typescript-eslint/consistent-type-exports": 0,
+		"@typescript-eslint/dot-notation": ["error", {
+			"allowKeywords": true,
+			"allowPrivateClassPropertyAccess": false,
+			"allowProtectedClassPropertyAccess": false,
+			"allowIndexSignaturePropertyAccess": true
+		}],
+		"@typescript-eslint/naming-convention": [
+			"error",
+			{
+				"selector": "default",
+				"format": ["camelCase"],
+				"leadingUnderscore": "forbid",
+				"trailingUnderscore": "forbid"
+			},
+			{"selector": "variable",  "format": ["camelCase", "UPPER_CASE"]},
+			{"selector": "parameter", "format": ["camelCase"]},
+			{"selector": "typeLike",  "format": ["PascalCase"]},
+			{"custom": "^_(?!_)",     "trailingUnderscore": "require"},
+			{"custom": "(?<!_)_$",    "leadingUnderscore":  "require"},
+			{"custom": "(?<!_)__$",   "leadingUnderscore":  "requireDouble"},
+			{"custom": "^__(?!_)",    "trailingUnderscore": "requireDouble"},
+			{"custom": "^___|___$",   "match": false}
+		],
+		"@typescript-eslint/no-base-to-string": 0,
+		"@typescript-eslint/no-confusing-void-expression": ["error", {
+			"ignoreArrowShorthand": true,
+			"ignoreVoidOperator": true
+		}],
+		"@typescript-eslint/no-floating-promises": ["error", {
+			"ignoreVoid": true,
+			"ignoreIIFE": true
+		}],
+		"@typescript-eslint/no-for-in-array": "error",
+		"@typescript-eslint/no-implied-eval": "error",
+		"@typescript-eslint/no-meaningless-void-operator": "error",
+		"@typescript-eslint/no-misused-promises": ["error", {
+			"checksConditionals": true,
+			"checksVoidReturn":   true,
+			"checksSpreads":      true
+		}],
+		"@typescript-eslint/no-redundant-type-constituents": "error",
+		"@typescript-eslint/no-unnecessary-boolean-literal-compare": ["error", {
+			"allowComparingNullableBooleansToTrue": true,
+			"allowComparingNullableBooleansToFalse": true
+		}],
+		"@typescript-eslint/no-unnecessary-condition": ["error", {
+			"allowConstantLoopConditions": true
+		}],
+		"@typescript-eslint/no-unnecessary-qualifier": "error",
+		"@typescript-eslint/no-unnecessary-type-arguments": "error",
+		"@typescript-eslint/no-unnecessary-type-assertion": "error",
+		"@typescript-eslint/no-unsafe-argument": "error",
+		"@typescript-eslint/no-unsafe-assignment": "error",
+		"@typescript-eslint/no-unsafe-call": "error",
+		"@typescript-eslint/no-unsafe-member-access": "error",
+		"@typescript-eslint/no-unsafe-return": "error",
+		"@typescript-eslint/non-nullable-type-assertion-style": "error",
+		"@typescript-eslint/prefer-includes": 0,
+		"@typescript-eslint/prefer-nullish-coalescing": ["error", {
+			"ignoreTernaryTests": true,
+			"ignoreConditionalTests": true,
+			"ignoreMixedLogicalExpressions": true
+		}],
+		"@typescript-eslint/prefer-readonly": ["error", {
+			"onlyInlineLambdas": true
+		}],
+		"@typescript-eslint/prefer-readonly-parameter-types": ["error", {
+			"checkParameterProperties": true,
+			"ignoreInferredTypes": true,
+			"treatMethodsAsReadonly": false
+		}],
+		"@typescript-eslint/prefer-reduce-type-parameter": "error",
+		"@typescript-eslint/prefer-regexp-exec": 0,
+		"@typescript-eslint/prefer-return-this-type": "error",
+		"@typescript-eslint/prefer-string-starts-ends-with": "error",
+		"@typescript-eslint/promise-function-async": "error",
+		"@typescript-eslint/require-array-sort-compare": ["error", {
+			"ignoreStringArrays": true
+		}],
+		"@typescript-eslint/require-await": "error",
+		"@typescript-eslint/restrict-plus-operands": ["error", {
+			"checkCompoundAssignments": true,
+			"allowAny": true
+		}],
+		"@typescript-eslint/restrict-template-expressions": ["error", {
+			"allowAny":     true,
+			"allowNumber":  true,
+			"allowBoolean": false,
+			"allowNullish": false,
+			"allowRegExp":  false
+		}],
+		"@typescript-eslint/return-await": "error",
+		"@typescript-eslint/strict-boolean-expressions": 0,
+		"@typescript-eslint/switch-exhaustiveness-check": 0,
+		"@typescript-eslint/unbound-method": ["error", {
+			"ignoreStatic": true
+		}]
+	}
+}
