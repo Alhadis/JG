@@ -232,8 +232,10 @@ function getContentType(file){
 		ogv:   "video/ogg",
 		ogg:   "application/ogg",
 		otf:   "font/otf",
+		pcx:   "image/x-pcx",
 		pdf:   "application/pdf",
 		png:   "image/png",
+		tga:   "image/x-tga",
 		tiff:  "image/tiff",
 		tif:   "image/tiff",
 		ttc:   "font/collection",
@@ -244,7 +246,9 @@ function getContentType(file){
 		webp:  "image/webp",
 		woff:  "font/woff",
 		woff2: "font/woff2",
+		xbm:   "image/x-xbitmap",
 		xcf:   "image/x-xcf",
+		xpm:   "image/x-xpixmap",
 	};
 	const text = {
 		appcache:    "text/cache-manifest",
