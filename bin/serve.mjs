@@ -211,7 +211,7 @@ function getContentType(file){
 	const binary = {
 		ai:    "application/pdf",
 		avif:  "image/avif",
-		apng:  "image/png",
+		apng:  "image/apng",
 		bmp:   "image/bmp",
 		cat:   "application/octet-stream",
 		djvu:  "image/vnd.djvu",
