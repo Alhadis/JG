@@ -282,6 +282,8 @@ function getContentType(file){
 		webmanifest: "application/manifest+json",
 		yaml:        "text/x-yaml",
 		yml:         "text/x-yaml",
+		xhtm:        "application/xhtml+xml",
+		xhtml:       "application/xhtml+xml",
 		xml:         "text/xml",
 	};
 	const defaultType = "text/plain";
