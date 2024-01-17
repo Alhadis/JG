@@ -152,7 +152,7 @@ export async function run(cmd, args, options = {}){
  */
 export async function lintJavaScript(files, options){
 	const args = ["--ext", "cjs,mjs,js", "--", ...files];
-	const base = options.atom ? "/atom" : options.babel ? "/babel" : "";
+	const base = options.atom ? "/atom" : options.babel ? "/babel" : "/index.js";
 	let linked = false;
 	let stats = null;
 	
