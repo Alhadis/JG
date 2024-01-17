@@ -21,7 +21,7 @@ if(process.argv[1] === path || globalThis.$0 === path){
 		if(process.stdout.isTTY)
 			process.stdout.write("\n");
 	}
-	process.exit(status);
+	process.exit(+status);
 }
 
 
