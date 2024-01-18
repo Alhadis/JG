@@ -4,7 +4,7 @@
 	"plugins": ["@typescript-eslint"],
 	"rules": {
 		"@typescript-eslint/adjacent-overload-signatures": 0,
-		"@typescript-eslint/array-type": ["error", "array"],
+		"@typescript-eslint/array-type": ["error", {"default": "array-simple"}],
 		"@typescript-eslint/ban-tslint-comment": "error",
 		"@typescript-eslint/ban-types": "error",
 		"@typescript-eslint/class-literal-property-style": 0,
@@ -74,13 +74,18 @@
 			"allowBitwiseExpressions": true
 		}],
 		"@typescript-eslint/prefer-namespace-keyword": "error",
-		"@typescript-eslint/prefer-optional-chain": "error",
 		"@typescript-eslint/prefer-ts-expect-error": "error",
-		"@typescript-eslint/sort-type-union-intersection-members": "error",
+		"@typescript-eslint/sort-type-constituents": "error",
 		"@typescript-eslint/triple-slash-reference": 0,
 		"@typescript-eslint/type-annotation-spacing": ["error", {
 			"before": false,
-			"after": true
+			"after": true,
+			"overrides": {
+				"variable": {
+					"after": false,
+					"before": false
+				}
+			}
 		}],
 		"@typescript-eslint/typedef": 0,
 		"@typescript-eslint/unified-signatures": "error",
@@ -136,9 +141,6 @@
 				"finally": {"after": false},
 				"with":    {"after": false}
 			}
-		}],
-		"@typescript-eslint/no-duplicate-imports": ["error", {
-			"includeExports": true
 		}],
 		"@typescript-eslint/no-loss-of-precision": "error",
 		"@typescript-eslint/no-useless-constructor": "error",

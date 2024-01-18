@@ -117,6 +117,7 @@
 		"import/no-unresolved": "error",
 		"import/no-useless-path-segments": "error",
 		"import/no-webpack-loader-syntax": "error",
+		"import/no-duplicates": ["error", {"considerQueryString": true}],
 		"linebreak-style": "error",
 		"multiline-comment-style": [
 			"error",

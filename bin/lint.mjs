@@ -9,7 +9,7 @@ import getOpts         from "get-options";
 import {findBasePath, ls, which, splitStrings} from "alhadis.utils";
 
 const JS_EXT = /\.(?:[cm]js|jsx?)$/i;
-const TS_EXT = /\.tsx?$/i;
+const TS_EXT = /\.(?:[cm]ts|tsx?)$/i;
 const CS_EXT = /\.(?:cson|coffee)$/i;
 
 const JS_ENGINES = "chakra d8 gjs js mujs node qjs rhino slimerjs v8 v8-shell".split(" ");
@@ -90,7 +90,6 @@ export async function lint(paths, options = {}){
 	// Ensure all required dependencies are available
 	const missing = [];
 	if(js.length     && !await which("eslint"))     missing.push("eslint");
-	if(ts.length     && !await which("tslint"))     missing.push("tslint");
 	if(coffee.length && !await which("coffeelint")) missing.push("coffeelint");
 	if(missing.length){
 		const names = missing.join(", ");
@@ -197,18 +196,17 @@ export async function lintJavaScript(files, options){
 
 
 /**
- * Run `tslint` on the root directory enclosing each specified pathname.
+ * Run `eslint` with TypeScript-specific linting rules.
  *
- * @example lintTypeScript(["/foo/bar", "/foo/baz"]) => `tslint --project /foo`;
  * @param {String[]} files - Resolved pathnames
  * @param {Object} options - Options hash
- * @return {Number} Exit code reported by TSLint
+ * @return {Number} Exit code reported by ESLint
  * @internal
  */
 export async function lintTypeScript(files, options){
-	const configFile = getPath("tslint.json");
-	const args = ["-c", configFile, ...files];
-	return run("tslint", args, options);
+	const configFile = getPath("eslint/typescript");
+	const args = ["--config", configFile, "--", ...files];
+	return run("eslint", args, options);
 }
 
 
