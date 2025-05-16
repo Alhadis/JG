@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+<meta name="viewport" content="initial-scale=1, minimum-scale=1"/>
+<title>Offloader</title>
+</head>
+
+<body>
+	<form method="POST" enctype="multipart/form-data">
+		<input type="file" name="cargo" required multiple/><br/>
+		<input type="submit" value="Submit"/>
+		<input type="reset"  value="Clear"/>
+	</form>
+	<script type="module">
+		const [[picker]] = document.forms;
+		picker.onchange = event => console.log(picker.files);
+	</script>
+</body>
+</html>
