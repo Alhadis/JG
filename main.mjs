@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import {createReadStream, statSync, existsSync} from "fs";
+import {createReadStream, statSync, existsSync, openSync, writeSync, closeSync} from "fs";
 import {promisify}     from "util";
 import {createServer}  from "http";
 import {fileURLToPath} from "url";
@@ -13,10 +13,15 @@ const $0  = fileURLToPath(import.meta.url);
 const dir = dirname($0);
 
 
+
+
 createServer((request, response) => {
 	switch(request.method){
-		case "POST": break; // TODO
-		case "GET":
+		case "POST":
+			const file = join(dir, "posted-data");
+			return writeBodyToFile(file, request, response);
+
+		case "GET": {
 			const {url} = request;
 			const file = join(dir, "/" === url ? "index.html" : url);
 			
@@ -37,6 +42,7 @@ createServer((request, response) => {
 			
 			// Otherwise, serve the requested file
 			return sendFile(response, file, stats);
+		}
 	}
 }).listen(1337);
 useGracefulQuit();
@@ -109,6 +115,37 @@ function showError(response, code, message = "Error " + code){
 		"Content-Length": error.length,
 	});
 	response.write(error);
+	return response.end();
+}
+
+
+/**
+ * Write the body of a POST request to a file.
+ *
+ * @param {String} path
+ * @param {IncomingMessage} request
+ * @param {ServerResponse} response
+ * @param {Boolean} [append=false]
+ * @internal
+ */
+async function writeBodyToFile(path, request, response, append = false){
+	const fd = openSync(path, append ? "a" : "w");
+	const totalSize = await new Promise(resolve => {
+		let bytesWritten = 0;
+		request.on("readable", () => {
+			const chunk = request.read();
+			if(null === chunk)
+				return resolve(bytesWritten);
+			bytesWritten += writeSync(fd, chunk, 0, chunk.byteLength);
+		});
+	});
+	closeSync(fd);
+	const text = `${totalSize} byte(s) written to ${path}\n`;
+	response.writeHead(201, {
+		"Content-Type": "text/plain; charset=utf-8",
+		"Content-Length": text.length,
+	});
+	response.write(text);
 	return response.end();
 }
 
