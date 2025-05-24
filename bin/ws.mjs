@@ -767,7 +767,7 @@ export function encode(data, maxSize = Infinity){
 		data = utf8Decode(data);
 		opcode = 0x01;
 	}
-	else data = [...data];
+	data = [...data];
 	const frames = [];
 	do{
 		frames.push(wsEncodeFrame({
