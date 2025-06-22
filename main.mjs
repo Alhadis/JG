@@ -302,8 +302,8 @@ export function getMediaType(file){
 		xhtm:        "application/xhtml+xml",
 		xhtml:       "application/xhtml+xml",
 		xml:         "text/xml",
-		xsl:         "application/xslt+xml",
-		xslt:        "application/xslt+xml",
+		xsl:         "text/xsl",
+		xslt:        "text/xsl",
 		xsd:         "text/xml",
 	};
 	let [extension] = file.match(/(?<=\.)[-\w]+$/) || [];
