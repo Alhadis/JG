@@ -30,10 +30,11 @@ if(process.argv[1] === path || globalThis.$0 === path){
 		for(const arg of argv){
 			const path = await findModule(arg, dir);
 			null !== path
-				? quiet || shell
+				? quiet || (shell
 					? printShellVariable(arg, path)
-					: process.stdout.write(path + "\n")
+					: process.stdout.write(path + "\n"))
 				: status = 1;
+			if(quiet && status) break;
 		}
 		process.exit(status);
 	})().catch(error => {
