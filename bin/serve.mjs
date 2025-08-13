@@ -19,6 +19,7 @@ import {
 	deindent as HTML,
 } from "alhadis.utils";
 import {useGracefulQuit} from "./ws.mjs";
+import {inspect} from "util";
 
 
 // Resolve CLI switches
@@ -42,6 +43,14 @@ const noIndex   = !!options.noIndex;
 const printPost = !!options.printPost;
 const trace     = !!options.trace;
 
+// Swap I/O channels if `--print-post` is used and output is redirected
+const tty = !!process.stdout.isTTY;
+const raw = !tty && (printPost || trace);
+const log = (...args) => raw
+	? process.stderr.write(args.map(arg =>
+		"string" === typeof arg ? arg : inspect(arg)
+	).join(" ") + "\n")
+	: console.log(...args);
 
 // Configure mount-points
 let mounts = new Map();
@@ -53,7 +62,7 @@ for(const mapping of mappings || []){
 	to = path.resolve(to);
 	if(fs.existsSync(to)){
 		from = (from.join(":").replace(/^\/|\/$/g, "")) || path.basename(to);
-		console.log(`Mounted: ${tildify(to)} -> /${from}`);
+		log(`Mounted: ${tildify(to)} -> /${from}`);
 		mounts.set(from, to);
 	}
 	else throw new Error(`No such file or directory: ${to}`);
@@ -96,14 +105,23 @@ const server = HTTP.createServer(async (request, response) => {
 	// Trace incoming requests to standard output
 	if(trace){
 		const {method, rawHeaders, httpVersion, url} = request;
-		console.log(escape(`${method} ${url} HTTP/${httpVersion}`));
+		let headers = `${method} ${url} HTTP/${httpVersion}\n`;
 		for(let i = 0; i < rawHeaders.length; i += 2)
-			console.log(escape(rawHeaders.slice(i, i + 2).join(": ")));
-		console.log("");
+			headers += rawHeaders.slice(i, i + 2).join(": ") + "\n";
+		!tty || printPost
+			? process.stdout.write(headers + "\n")
+			: log(escape(headers));
 	}
 	
-	if(printPost && "POST" === request.method)
-		console.log(escape(await receive(request)));
+	if(printPost && "POST" === request.method){
+		const body = await receive(request, raw);
+		if(raw){
+			process.stdout.write(body);
+			log("Posted data written to stdout; exiting");
+			process.exit(0);
+		}
+		else console.log(escape(body))
+	}
 	
 	// Return an HTML wrapper for JS files loaded as root
 	const url = request.url.replace(/\?.*$/, "");
@@ -184,10 +202,10 @@ const server = HTTP.createServer(async (request, response) => {
 });
 
 server.listen(port);
-console.log(`[PID: ${process.pid}] Serving files from ${tildify(root)} on port ${port}`);
-noIndex   && console.log("--no-index passed: directory indexes will not be displayed");
-printPost && console.log("--print-post enabled: POST bodies will be echoed to stdout");
-trace     && console.log("--trace enabled: incoming requests will be echoed to stdout");
+log(`[PID: ${process.pid}] Serving files from ${tildify(root)} on port ${port}`);
+noIndex   && log("--no-index passed: directory indexes will not be displayed");
+printPost && log("--print-post enabled: POST bodies will be echoed to stdout");
+trace     && log("--trace enabled: incoming requests will be echoed to stdout");
 useGracefulQuit();
 
 
@@ -354,7 +372,7 @@ async function getFileForURL(input, silent = false){
 		}
 	
 	if(!fs.existsSync(file)){
-		silent || console.log("No such file: " + file);
+		silent || console.warn("No such file: " + file);
 		return {};
 	}
 
@@ -415,16 +433,18 @@ async function send(file, response){
  * Receive data submitted with an HTTP request.
  *
  * @param {IncomingMessage}
+ * @param {Boolean} [raw=false]
  * @return {Promise}
  */
-async function receive(request){
+async function receive(request, raw = false){
 	return new Promise(resolve => {
 		const chunks = [];
 		request.on("readable", () => {
 			const chunk = request.read();
-			null !== chunk
-				? chunks.push(chunk)
-				: resolve(Buffer.concat(chunks).toString("utf8"));
+			if(null !== chunk)
+				return chunks.push(chunk);
+			const result = Buffer.concat(chunks);
+			resolve(raw ? result : result.toString("utf8"));
 		});
 	});
 }
