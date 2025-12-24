@@ -136,9 +136,9 @@ const server = HTTP.createServer(async (request, response) => {
 			<!DOCTYPE html>
 			<html lang="en-AU">
 			<head>
-				<meta charset="utf-8" />
+				<meta charset="utf-8"/>
 				<title>${wrapperName}</title>
-				<style>*{tab-size: 4;}</style>
+				<style>:root{color-scheme:light dark}*{tab-size:4}</style>
 			</head><body><script${type}>${file}</script></body></html>
 		`.trim().replace(/^\t+(?=<[/\w])/gm, "");
 		response.writeHead(200, {
@@ -521,8 +521,9 @@ async function makeIndex(dir){
 		<!DOCTYPE html>
 		<html lang="en-AU">
 		<head>
-			<meta charset="utf-8" />
-			<meta name="viewport" content="initial-scale=1, minimum-scale=1" />
+			<meta charset="utf-8"/>
+			<meta name="color-scheme" content="light dark"/>
+			<meta name="viewport" content="initial-scale=1, minimum-scale=1"/>
 			<title>${title}</title>
 			<style>
 				*    { box-sizing: border-box; tab-size: 4; }
