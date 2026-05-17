@@ -161,8 +161,16 @@ export async function lintJavaScript(files, options){
 		stats = Object.assign(fs.statSync(cwd), {path: cwd});
 		linked = resolve("node_modules");
 		const source = resolve(path, "..", "..", "node_modules");
-		+process.env.DEBUG && console.log(`Linking: ${source} -> ${linked}`);
-		fs.symlinkSync(source, linked);
+		
+		// Hard-link the actual symbolic link if filesystem boundaries allow
+		if(stats.dev === fs.lstatSync(source).dev && "/" === fs.readlinkSync(source)[0]){
+			+process.env.DEBUG && console.log(`Linking: ${source} => ${linked}`);
+			await run("ln", ["-P", source, linked]);
+		}
+		else{
+			+process.env.DEBUG && console.log(`Linking: ${source} -> ${linked}`);
+			fs.symlinkSync(source, linked);
+		}
 	}
 	
 	// Ignore whatever ESLint configs are in the working directory
