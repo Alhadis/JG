@@ -24,6 +24,7 @@ if(process.argv[1] === path || globalThis.$0 === path){
 		"-b, --babel": "",
 		"-j, --js": "",
 		"-t, --ts": "",
+		"-5, --es5": "",
 		"-C, --ignore-config": "",
 		"-c, --coffee": "",
 		"-E, --eslint-options": "[opts]",
@@ -151,7 +152,12 @@ export async function run(cmd, args, options = {}){
  */
 export async function lintJavaScript(files, options){
 	const args = ["--ext", "cjs,mjs,js", "--", ...files];
-	const base = options.atom ? "/atom" : options.babel ? "/babel" : "/index.js";
+	const base = (
+		options.atom  ? "/atom"  :
+		options.babel ? "/babel" :
+		options.es5   ? "/es5"   :
+		"/index.js"
+	);
 	let linked = false;
 	let stats = null;
 	
