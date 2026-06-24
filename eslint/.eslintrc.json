@@ -2,7 +2,7 @@
 	"extends": "eslint:recommended",
 	"env": {
 		"browser": true,
-		"es2022": true,
+		"es2024": true,
 		"mocha": true,
 		"node": true
 	},
@@ -11,7 +11,7 @@
 		"ecmaVersion": "latest",
 		"sourceType": "module"
 	},
-	"plugins": ["import"],
+	"plugins": ["import", "regexp"],
 	"settings": {
 		"import/core-modules": ["atom", "electron"],
 		"import/extensions":   [".js", ".mjs"]
@@ -119,6 +119,11 @@
 		"import/no-webpack-loader-syntax": "error",
 		"import/no-duplicates": ["error", {"considerQueryString": true}],
 		"linebreak-style": "error",
+		"logical-assignment-operators": [
+			"error",
+			"always",
+			{"enforceForIfStatements": true}
+		],
 		"multiline-comment-style": [
 			"error",
 			"separate-lines"
@@ -130,7 +135,10 @@
 		"new-parens": "error",
 		"no-fallthrough": [
 			"error",
-			{"commentPattern": "[Ff]alls?[-\\s]?through"}
+			{
+				"commentPattern": "[Ff]alls?[-\\s]?through",
+				"allowEmptyCase": true
+			}
 		],
 		"no-duplicate-imports": [
 			"error",
@@ -141,19 +149,25 @@
 		"no-cond-assign": 0,
 		"no-console": 0,
 		"no-control-regex": 0,
+		"no-div-regex": 0,
 		"no-dupe-else-if": "error",
 		"no-empty": 0,
+		"no-empty-character-class": 0,
+		"no-empty-static-block": "error",
 		"no-ex-assign": 0,
 		"no-import-assign": "error",
+		"no-invalid-regexp": 0,
 		"no-iterator": "error",
 		"no-loss-of-precision": "error",
+		"no-misleading-character-class": 0,
+		"no-new-native-nonconstructor": "error",
 		"no-nonoctal-decimal-escape": "error",
+		"no-object-constructor": "error",
 		"no-unsafe-optional-chaining": "error",
 		"no-unused-private-class-members": "error",
 		"no-constant-binary-expression": "error",
 		"prefer-object-has-own": "error",
 		"no-new-require": "error",
-		"no-return-await": "error",
 		"no-self-compare": "error",
 		"no-setter-return": 0,
 		"no-sparse-arrays": 0,
@@ -167,11 +181,18 @@
 		"no-undef-init": "error",
 		"no-underscore-dangle": [
 			"error",
-			{"allowAfterThis": true}
+			{
+				"allowAfterThis": true,
+				"allowInArrayDestructuring": false,
+				"allowInObjectDestructuring": false,
+				"allowFunctionParams": false
+			}
 		],
 		"no-unneeded-ternary": "error",
+		"no-useless-backreference": 0,
 		"no-useless-concat": "error",
 		"no-useless-constructor": "error",
+		"no-useless-escape": 0,
 		"no-useless-rename": "error",
 		"no-var": "error",
 		"no-with": "error",
@@ -200,6 +221,7 @@
 			},
 			{"enforceForRenamedProperties": false}
 		],
+		"prefer-named-capture-group": 0,
 		"prefer-numeric-literals": "error",
 		"prefer-object-spread": "error",
 		"prefer-regex-literals": "error",
@@ -214,9 +236,136 @@
 			"error",
 			"as-needed"
 		],
+		"regexp/confusing-quantifier": "error",
+		"regexp/control-character-escape": "error",
+		"regexp/grapheme-string-literal": 0,
+		"regexp/hexadecimal-escape": ["error", "always"],
+		"regexp/letter-case": [
+			"error",
+			{
+				"caseInsensitive":   "ignore",
+				"unicodeEscape":     "uppercase",
+				"hexadecimalEscape": "uppercase",
+				"controlEscape":     "uppercase"
+			}
+		],
+		"regexp/match-any": ["error", {"allows": ["dotAll", "[^]"]}],
+		"regexp/negation": "error",
+		"regexp/no-contradiction-with-assertion": "error",
+		"regexp/no-control-character": 0,
+		"regexp/no-dupe-characters-character-class": "error",
+		"regexp/no-dupe-disjunctions": [
+			"error",
+			{
+				"report": "trivial",
+				"reportExponentialBacktracking": "certain",
+				"reportUnreachable": "certain"
+			}
+		],
+		"regexp/no-empty-alternative": "error",
+		"regexp/no-empty-capturing-group": 0,
+		"regexp/no-empty-character-class": "error",
+		"regexp/no-empty-group": "error",
+		"regexp/no-empty-lookarounds-assertion": "error",
+		"regexp/no-empty-string-literal": "error",
+		"regexp/no-escape-backspace": "error",
+		"regexp/no-extra-lookaround-assertions": "error",
+		"regexp/no-invalid-regexp": "error",
+		"regexp/no-invisible-character": "error",
+		"regexp/no-lazy-ends": ["error", {"ignorePartial": true}],
+		"regexp/no-legacy-features": 0,
+		"regexp/no-misleading-capturing-group": ["error", {"reportBacktrackingEnds": true}],
+		"regexp/no-misleading-unicode-character": ["error", {"fixable": false}],
+		"regexp/no-missing-g-flag": ["error", {"strictTypes": true}],
+		"regexp/no-non-standard-flag": 0,
+		"regexp/no-obscure-range": 0,
+		"regexp/no-octal": "error",
+		"regexp/no-optional-assertion": "error",
+		"regexp/no-potentially-useless-backreference": 0,
+		"regexp/no-standalone-backslash": "error",
+		"regexp/no-super-linear-backtracking": ["error", {"report": "certain"}],
+		"regexp/no-super-linear-move": [
+			"error",
+			{
+				"report": "certain",
+				"ignoreSticky": true,
+				"ignorePartial": true
+			}
+		],
+		"regexp/no-trivially-nested-assertion": "error",
+		"regexp/no-trivially-nested-quantifier": "error",
+		"regexp/no-unused-capturing-group": [
+			"error",
+			{
+				"fixable": false,
+				"allowNamed": true
+			}
+		],
+		"regexp/no-useless-assertions": "error",
+		"regexp/no-useless-backreference": "error",
+		"regexp/no-useless-character-class": ["error", {"ignores": []}],
+		"regexp/no-useless-dollar-replacements": "error",
+		"regexp/no-useless-escape": "error",
+		"regexp/no-useless-flag": ["error", {"strictTypes": true}],
+		"regexp/no-useless-lazy": "error",
+		"regexp/no-useless-non-capturing-group": ["error", {"allowTop": "partial"}],
+		"regexp/no-useless-quantifier": "error",
+		"regexp/no-useless-range": "error",
+		"regexp/no-useless-set-operand": "error",
+		"regexp/no-useless-string-literal": "error",
+		"regexp/no-useless-two-nums-quantifier": "error",
+		"regexp/no-zero-quantifier": "error",
+		"regexp/optimal-lookaround-quantifier": "error",
+		"regexp/optimal-quantifier-concatenation": ["error", {"capturingGroups": "report"}],
+		"regexp/prefer-character-class": ["error", {"minAlternatives": 3}],
+		"regexp/prefer-d": ["error", {"insideCharacterClass": "ignore"}],
+		"regexp/prefer-escape-replacement-dollar-char": "error",
+		"regexp/prefer-lookaround": [
+			"error",
+			{
+				"lookbehind": true,
+				"strictTypes": true
+			}
+		],
+		"regexp/prefer-named-backreference": "error",
+		"regexp/prefer-named-capture-group": 0,
+		"regexp/prefer-named-replacement": ["error", {"strictTypes": true}],
+		"regexp/prefer-plus-quantifier": "error",
+		"regexp/prefer-predefined-assertion": "error",
+		"regexp/prefer-quantifier": 0,
+		"regexp/prefer-question-quantifier": "error",
+		"regexp/prefer-range": ["error", {"target": "all"}],
+		"regexp/prefer-regexp-exec": "error",
+		"regexp/prefer-regexp-test": "error",
+		"regexp/prefer-result-array-groups": 0,
+		"regexp/prefer-set-operation": "error",
+		"regexp/prefer-star-quantifier": "error",
+		"regexp/prefer-unicode-codepoint-escapes": "error",
+		"regexp/prefer-w": "error",
+		"regexp/require-unicode-regexp": 0,
+		"regexp/require-unicode-sets-regexp": 0,
+		"regexp/simplify-set-operations": "error",
+		"regexp/sort-alternatives": 0,
+		"regexp/sort-character-class-elements": ["error", {
+			"order": ["\\w", "\\d", "\\s", "\\p", "*", "\\q", "[]"]
+		}],
+		"regexp/sort-flags": "error",
+		"regexp/strict": "error",
+		"regexp/unicode-escape": ["error", "unicodeCodePointEscape"],
+		"regexp/unicode-property": [
+			"error",
+			{
+				"key": "long",
+				"property": "long",
+				"generalCategory": "never"
+			}
+		],
+		"regexp/use-ignore-case": "error",
+		"require-unicode-regexp": 0,
 		"semi": [
 			"error",
-			"always"
+			"always",
+			{"omitLastInOneLineClassBody": true}
 		],
 		"semi-spacing": "error",
 		"semi-style": [

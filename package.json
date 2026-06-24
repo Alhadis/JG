@@ -10,11 +10,12 @@
 	"eslintIgnore": ["**/firefox-headless.js"],
 	"dependencies": {
 		"alhadis.utils": "latest",
-		"@babel/eslint-parser": "^7.18.9",
-		"@typescript-eslint/eslint-plugin": "^5.37.0",
-		"@typescript-eslint/parser": "^5.37.0",
-		"eslint": "^8.22.0",
-		"eslint-plugin-import": "^2.26.0",
+		"@babel/eslint-parser": "^7.29.7",
+		"@typescript-eslint/eslint-plugin": "^5.62.0",
+		"@typescript-eslint/parser": "^5.62.0",
+		"eslint": "^8.57.1",
+		"eslint-plugin-import": "^2.32.0",
+		"eslint-plugin-regexp": "^2.10.0",
 		"get-options": "^1.2.0"
 	}
 }
