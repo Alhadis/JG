@@ -2,7 +2,7 @@
 
 import fs              from "fs";
 import {spawn}         from "child_process";
-import {resolve}       from "path";
+import {join, resolve} from "path";
 import {fileURLToPath} from "url";
 import getPath         from "./path.mjs";
 import getOpts         from "get-options";
@@ -125,6 +125,7 @@ export async function lint(paths, options = {}){
  * @param {String}   cmd - Executable's name
  * @param {String[]} args - Arguments list
  * @param {Object}  [options] - Hash containing additional options
+ * @param {Object}  [options.env={}] - Environment variables set in process
  * @param {Boolean} [options.echo=false] - Echo command to stderr
  * @param {String}  [options.stdio="inherit"] - I/O specifier
  * @return {Number} Resolves with the command's exit code.
@@ -132,8 +133,18 @@ export async function lint(paths, options = {}){
  */
 export async function run(cmd, args, options = {}){
 	const {stdio = "inherit"} = options;
-	options.noEcho || process.stderr.write(`${cmd} ${args.join(" ")}\n`);
-	const proc = spawn(cmd, args, {windowsHide: true, stdio});
+	const vars = Object.entries(options.env || {});
+	const env = vars.length ? {...process.env, ...options.env} : undefined;
+	if(!options.noEcho){
+		let envKeys = "";
+		for(let [key, value] of vars){
+			if(!/^\w*$/.test(value))
+				value = "'" + `${value}`.replace(/'/g, "'\\''") + "'";
+			envKeys += `${key}=${value} `;
+		}
+		process.stderr.write(`${envKeys}${cmd} ${args.join(" ")}\n`);
+	}
+	const proc = spawn(cmd, args, {windowsHide: true, stdio, env});
 	const code = await new Promise((resolve, reject) => {
 		proc.on("close", code => resolve(code));
 		proc.on("error", error => reject(error));
@@ -151,6 +162,7 @@ export async function run(cmd, args, options = {}){
  * @internal
  */
 export async function lintJavaScript(files, options){
+	const env = findFlatESLintConfig() ? {ESLINT_USE_FLAT_CONFIG: false} : undefined;
 	const args = ["--ext", "cjs,mjs,js", "--", ...files];
 	const base = (
 		options.atom  ? "/atom"  :
@@ -187,7 +199,7 @@ export async function lintJavaScript(files, options){
 	}
 	
 	// Otherwise, test if ESLint can find a config file
-	else if(2 === await run("eslint", ["--print-config", "-"], {...options, stdio: "ignore"})){
+	else if(2 === await run("eslint", ["--print-config", "-"], {...options, env, stdio: "ignore"})){
 		const configFile = getPath("eslint" + base);
 		+process.env.DEBUG && console.log(`Can't find config. Using ${configFile}`);
 		args.unshift("--config", configFile);
@@ -199,7 +211,7 @@ export async function lintJavaScript(files, options){
 		+process.env.DEBUG && console.log(`Prepending options: ${extraOpts}`);
 		args.unshift(...extraOpts);
 	}
-	const code = await run("eslint", args, options);
+	const code = await run("eslint", args, {...options, env});
 	if(linked){
 		+process.env.DEBUG && console.log(`Unlinking: ${linked}`);
 		fs.unlinkSync(linked);
@@ -220,7 +232,8 @@ export async function lintJavaScript(files, options){
 export async function lintTypeScript(files, options){
 	const configFile = getPath("eslint/typescript");
 	const args = ["--config", configFile, "--", ...files];
-	return run("eslint", args, options);
+	const env = findFlatESLintConfig() ? {ESLINT_USE_FLAT_CONFIG: false} : undefined;
+	return run("eslint", args, {...options, env});
 }
 
 
@@ -240,6 +253,42 @@ export async function lintCoffeeScript(files, options){
 	const configFile = getPath("coffeelint.json");
 	const args = ["-q", "--ext", "cson", "-f", configFile, ...files];
 	return run("coffeelint", args, options);
+}
+
+
+/**
+ * Search a directory and its ancestors for a flat ESLint config.
+ *
+ * Results are cached in a null-prototype object stored on the function object itself.
+ *
+ * @param {String} [from=process.cwd] - Initial directory to begin search from
+ * @return {?String} - If found, the config's absolute path; otherwise, null.
+ * @internal
+ */
+export function findFlatESLintConfig(from = process.cwd()){
+	if("false" === `${process.env.ESLINT_USE_FLAT_CONFIG}`)
+		return null;
+	+process.env.DEBUG && console.log("Checking for flat ESLint config…");
+	const cache = findFlatESLintConfig.cache ||= {__proto__: null};
+	if(from in cache){
+		+process.env.DEBUG && console.log("Reusing result cached from directory: " + from);
+		return cache[from];
+	}
+	
+	const origPath = from;
+	do{
+		for(const name of ["eslint.config.js", "eslint.config.mjs", "eslint.config.cjs"]){
+			const file = join(from, name);
+			if(fs.existsSync(file)){
+				+process.env.DEBUG && console.log("Found flat config file: " + file);
+				return cache[origPath] = file;
+			}
+		}
+		from = resolve(from, "..");
+	} while("/" !== from);
+	
+	+process.env.DEBUG && console.log("No flat config file found");
+	return cache[origPath] = null;
 }
 
 
