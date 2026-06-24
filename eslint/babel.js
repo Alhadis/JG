@@ -1,6 +1,7 @@
 // Use Babel for linting projects that leverage stage 3 ECMAScript features
 "use strict";
 
+process.env.BROWSERSLIST_IGNORE_OLD_DATA = true;
 module.exports = {...require("./.eslintrc.json")};
 module.exports.parser = "@babel/eslint-parser";
 Object.assign(module.exports.parserOptions, {
