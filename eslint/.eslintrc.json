@@ -335,8 +335,8 @@
 		"regexp/prefer-quantifier": 0,
 		"regexp/prefer-question-quantifier": "error",
 		"regexp/prefer-range": ["error", {"target": "all"}],
-		"regexp/prefer-regexp-exec": "error",
-		"regexp/prefer-regexp-test": "error",
+		"regexp/prefer-regexp-exec": 0,
+		"regexp/prefer-regexp-test": 0,
 		"regexp/prefer-result-array-groups": 0,
 		"regexp/prefer-set-operation": "error",
 		"regexp/prefer-star-quantifier": "error",
@@ -346,9 +346,7 @@
 		"regexp/require-unicode-sets-regexp": 0,
 		"regexp/simplify-set-operations": "error",
 		"regexp/sort-alternatives": 0,
-		"regexp/sort-character-class-elements": ["error", {
-			"order": ["\\w", "\\d", "\\s", "\\p", "*", "\\q", "[]"]
-		}],
+		"regexp/sort-character-class-elements": 0,
 		"regexp/sort-flags": "error",
 		"regexp/strict": "error",
 		"regexp/unicode-escape": ["error", "unicodeCodePointEscape"],
