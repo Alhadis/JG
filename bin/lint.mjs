@@ -215,7 +215,8 @@ export async function lintJavaScript(files, options){
 	if(linked){
 		+process.env.DEBUG && console.log(`Unlinking: ${linked}`);
 		fs.unlinkSync(linked);
-		fs.utimesSync(stats.path, stats.atime, stats.mtime);
+		try{ fs.utimesSync(stats.path, stats.atime, stats.mtime); }
+		catch(error){}
 	}
 	return code;
 }
