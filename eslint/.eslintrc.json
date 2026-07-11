@@ -72,6 +72,15 @@
 			"declaration",
 			{"allowArrowFunctions": true}
 		],
+		"generator-star-spacing": [
+			"error",
+			{
+				"before": false,
+				"after":  true,
+				"anonymous": "neither",
+				"method": {"before": true, "after": false}
+			}
+		],
 		"indent": [
 			"error",
 			"tab",
@@ -397,6 +406,7 @@
 		],
 		"unicode-bom": "error",
 		"vars-on-top": "error",
+		"yield-star-spacing": ["error", "after"],
 		"yoda": [
 			"error",
 			"always",
