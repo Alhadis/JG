@@ -39,7 +39,7 @@ if(process.argv[1] === path || globalThis.$0 === path){
 export default function getPath(filename){
 	
 	// Shorthand: ESLint
-	let match = filename.match(/^\.?eslint(?:rc|[-/]?config)?\/?(?:\b(atom|babel)(?:\.js)?\/?|(?:\.json)|(es5|typescript(?:\.full)?)(?:\.json)?)$/i);
+	let match = filename.match(/^\.?eslint(?:rc|[-/]?config)?\/?(?:\b(atom|babel|mw)(?:\.js)?\/?|(?:\.json)|(es5|typescript(?:\.full)?)(?:\.json)?)$/i);
 	if(null !== match){
 		const file = match[1] ? `${match[1]}.js` : match[2] ? `${match[2]}.json` : ".eslintrc.json";
 		return resolve(join(ROOT_DIR, "eslint", file));

@@ -25,6 +25,7 @@ if(process.argv[1] === path || globalThis.$0 === path){
 		"-j, --js": "",
 		"-t, --ts": "",
 		"-5, --es5": "",
+		"-m, --mw": "",
 		"-C, --ignore-config": "",
 		"-c, --coffee": "",
 		"-E, --eslint-options": "[opts]",
@@ -168,6 +169,7 @@ export async function lintJavaScript(files, options){
 		options.atom  ? "/atom"  :
 		options.babel ? "/babel" :
 		options.es5   ? "/es5"   :
+		options.mw    ? "/mw"    :
 		"/index.js"
 	);
 	let linked = false;

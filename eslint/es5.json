@@ -1,6 +1,7 @@
 {
 	"extends": "@alhadis/eslint-config",
 	"env": {
+		"browser": false,
 		"es2024": false,
 		"mocha": false,
 		"node": false
