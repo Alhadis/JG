@@ -9,7 +9,7 @@
 	"engines": {"node": ">=13.2.0"},
 	"eslintIgnore": ["**/firefox-headless.js"],
 	"dependencies": {
-		"alhadis.utils": "latest",
+		"alhadis.utils": "Alhadis/Utils#afb06502a",
 		"@babel/eslint-parser": "^7.29.7",
 		"@typescript-eslint/eslint-plugin": "^5.62.0",
 		"@typescript-eslint/parser": "^5.62.0",
