@@ -301,6 +301,7 @@ function getContentType(file){
 		n3:          "text/n3",
 		nq:          "application/n-quads",
 		nt:          "application/n-triples",
+		pac:         "application/x-ns-proxy-autoconfig",
 		pfa:         "application/postscript",
 		ps:          "application/postscript",
 		pic:         "text/troff",
