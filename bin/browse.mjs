@@ -197,15 +197,16 @@ export async function findFirefox(unstable = false){
 				"FirefoxNightly",
 				"Firefox Nightly",
 				"Firefox",
+				"Firefox Developer Edition",
 				"FirefoxDeveloperEdition",
 				"FirefoxAurora",
 			];
 			unstable || names.splice(0, 2);
 			for(const name of names){
-				const path = `/Applications/${name}.app/Contents/MacOS/firefox-bin`;
-				const home = join(process.env.HOME || "/", path);
-				if(existsSync(home)) return home;
-				if(existsSync(path)) return path;
+				let path = `/Applications/${name}.app/Contents/MacOS/firefox`;
+				let home = join(process.env.HOME || "/", path);
+				if(existsSync(home) || existsSync(home += "-bin")) return home;
+				if(existsSync(path) || existsSync(path += "-bin")) return path;
 			}
 			break;
 		}
