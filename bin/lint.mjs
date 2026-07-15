@@ -8,13 +8,13 @@ import getPath         from "./path.mjs";
 import getOpts         from "get-options";
 import {findBasePath, ls, which, splitStrings} from "alhadis.utils";
 
-const JS_EXT = /\.(?:[cm]js|jsx?)$/i;
+const JS_EXT = /\.(?:[cmns_]js|es[3-6]|js(?:[3-6bmsx]|cad|cript|fl|lib|pre)?|jake|javascript|pac|[sx]sjs|xsjslib)$|^Jakefile$/i;
 const TS_EXT = /\.(?:[cm]ts|tsx?)$/i;
-const CS_EXT = /\.(?:cson|coffee)$/i;
+const CS_EXT = /\.(?:cake|cjsx|iced|(?:lit|_)?coffee|coffee\.md)$|^Cakefile$/i;
 
-const JS_ENGINES = "chakra d8 gjs js mujs node qjs rhino slimerjs v8 v8-shell".split(" ");
-const TS_ENGINES = "deno tsc ts-node".split(" ");
-const CS_ENGINES = ["coffee"];
+const JS_ENGINES = "chakra d8 gjs graaljs javascriptcore js jsc mujs node nodejs phantomjs qjs rhino slimerjs sm spidermonkey v8 v8-shell xs".split(" ");
+const TS_ENGINES = "bun deno ts-node tsx".split(" ");
+const CS_ENGINES = ["coffee", "iced"];
 
 // Run linters if loading file directly
 const path = fileURLToPath(import.meta.url);
