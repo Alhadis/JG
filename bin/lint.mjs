@@ -30,6 +30,8 @@ if(process.argv[1] === path || globalThis.$0 === path){
 		"-c, --coffee": "",
 		"-E, --eslint-options": "[opts]",
 		"-q, --no-echo": "",
+		"-w, --warnings": "",
+		"-W, --fatal-warnings": ""
 	}, {noMixedOrder: true, noUndefined: true, terminator: "--"});
 	argv.length || argv.push(".");
 	lint(argv, options);
@@ -129,13 +131,18 @@ export async function lint(paths, options = {}){
  * @param {Object}  [options.env={}] - Environment variables set in process
  * @param {Boolean} [options.echo=false] - Echo command to stderr
  * @param {String}  [options.stdio="inherit"] - I/O specifier
+ * @param {String}  [options.input] - Text to write to standard input
+ * @param {Function}[options.output] - Callback fired with standard output
  * @return {Number} Resolves with the command's exit code.
  * @internal
  */
 export async function run(cmd, args, options = {}){
-	const {stdio = "inherit"} = options;
+	let {stdio = "inherit", input, output} = options;
 	const vars = Object.entries(options.env || {});
 	const env = vars.length ? {...process.env, ...options.env} : undefined;
+	stdio = "string" === typeof stdio ? new Array(3).fill(stdio) : [...stdio];
+	if(input)  stdio[0] = "pipe";
+	if(output) stdio[1] = "pipe";
 	if(!options.noEcho){
 		let envKeys = "";
 		for(let [key, value] of vars){
@@ -143,13 +150,25 @@ export async function run(cmd, args, options = {}){
 				value = "'" + `${value}`.replace(/'/g, "'\\''") + "'";
 			envKeys += `${key}=${value} `;
 		}
-		process.stderr.write(`${envKeys}${cmd} ${args.join(" ")}\n`);
+		process.stderr.write(`${envKeys}${cmd} ${args.join(" ")}`);
+		if(input){
+			let delimiter = "EOF", count = 0;
+			while(new RegExp("^" + delimiter + "$", "m").test(input))
+				delimiter = "EOF" + ++count;
+			process.stderr.write(` <<'${delimiter}'\n${input}\n${delimiter}`);
+		}
+		process.stderr.write("\n");
 	}
 	const proc = spawn(cmd, args, {windowsHide: true, stdio, env});
+	const encoding = "string" === typeof input ? "utf8" : null;
+	const stdout = [];
+	output && proc.stdout.on("data", data => stdout.push(data));
+	input  && proc.stdin.write(input, encoding, () => proc.stdin.end());
 	const code = await new Promise((resolve, reject) => {
 		proc.on("close", code => resolve(code));
 		proc.on("error", error => reject(error));
 	});
+	output && output(Buffer.concat(stdout));
 	return code;
 }
 
@@ -174,6 +193,8 @@ export async function lintJavaScript(files, options){
 	);
 	let linked = false;
 	let stats = null;
+	if(options.fatalWarnings)  args.unshift("--max-warnings=0");
+	else if(!options.warnings) args.unshift("--quiet");
 	
 	// Stubborn hack to force ESLint v6+ to work when run globally
 	if(!fs.existsSync("node_modules")){
@@ -236,6 +257,8 @@ export async function lintTypeScript(files, options){
 	const configFile = getPath("eslint/typescript");
 	const args = ["--config", configFile, "--", ...files];
 	const env = findFlatESLintConfig() ? {ESLINT_USE_FLAT_CONFIG: false} : undefined;
+	if(options.fatalWarnings)  args.unshift("--max-warnings=0");
+	else if(!options.warnings) args.unshift("--quiet");
 	return run("eslint", args, {...options, env});
 }
 
@@ -254,7 +277,40 @@ export async function lintTypeScript(files, options){
  */
 export async function lintCoffeeScript(files, options){
 	const configFile = getPath("coffeelint.json");
-	const args = ["-q", "--ext", "cson", "-f", configFile, ...files];
+	const args = ["--ext", "cson", "-f", configFile, ...files];
+	
+	// Sadly, CoffeeLint doesn't have an equivalent of ESLint's “--max-warnings” option
+	if(options.fatalWarnings){
+		let config = null;
+		const code = await run("coffeelint", ["--trimconfig", "-f", configFile], {
+			output(buffer){ config = JSON.parse(buffer); },
+		});
+		if(code) return code;
+		let changed = false;
+		for(const name in config){
+			const rule = config[name];
+			if("warn" === rule.level){
+				rule.level = "error";
+				changed = true;
+			}
+		}
+		// Read CoffeeLint config from standard input, if it was modified
+		if(changed){
+			config = JSON.stringify(config, null, "\t");
+			const index = args.indexOf(configFile);
+			if("win32" === process.platform){
+				const {tmpdir} = await import("os");
+				const tmpConfig = join(tmpdir(), "jg-coffeelint-fatal-warnings.json");
+				fs.writeFileSync(tmpConfig, config, "utf8");
+				args.splice(index, 1, tmpConfig);
+			}
+			else{
+				options.input = config;
+				args.splice(index, 1, "/dev/stdin");
+			}
+		}
+	}
+	else if(!options.warnings) args.unshift("-q");
 	return run("coffeelint", args, options);
 }
 

@@ -283,7 +283,7 @@
 		"regexp/no-invisible-character": "error",
 		"regexp/no-lazy-ends": ["error", {"ignorePartial": true}],
 		"regexp/no-legacy-features": 0,
-		"regexp/no-misleading-capturing-group": ["error", {"reportBacktrackingEnds": true}],
+		"regexp/no-misleading-capturing-group": ["warn", {"reportBacktrackingEnds": true}],
 		"regexp/no-misleading-unicode-character": ["error", {"fixable": false}],
 		"regexp/no-missing-g-flag": ["error", {"strictTypes": true}],
 		"regexp/no-non-standard-flag": 0,
@@ -292,9 +292,9 @@
 		"regexp/no-optional-assertion": "error",
 		"regexp/no-potentially-useless-backreference": 0,
 		"regexp/no-standalone-backslash": "error",
-		"regexp/no-super-linear-backtracking": ["error", {"report": "certain"}],
+		"regexp/no-super-linear-backtracking": ["warn", {"report": "certain"}],
 		"regexp/no-super-linear-move": [
-			"error",
+			"warn",
 			{
 				"report": "certain",
 				"ignoreSticky": true,
@@ -303,13 +303,7 @@
 		],
 		"regexp/no-trivially-nested-assertion": "error",
 		"regexp/no-trivially-nested-quantifier": "error",
-		"regexp/no-unused-capturing-group": [
-			"error",
-			{
-				"fixable": false,
-				"allowNamed": true
-			}
-		],
+		"regexp/no-unused-capturing-group": 0,
 		"regexp/no-useless-assertions": "error",
 		"regexp/no-useless-backreference": "error",
 		"regexp/no-useless-character-class": ["error", {"ignores": []}],
@@ -325,7 +319,7 @@
 		"regexp/no-useless-two-nums-quantifier": "error",
 		"regexp/no-zero-quantifier": "error",
 		"regexp/optimal-lookaround-quantifier": "error",
-		"regexp/optimal-quantifier-concatenation": ["error", {"capturingGroups": "report"}],
+		"regexp/optimal-quantifier-concatenation": ["warn", {"capturingGroups": "report"}],
 		"regexp/prefer-character-class": ["error", {"minAlternatives": 3}],
 		"regexp/prefer-d": ["error", {"insideCharacterClass": "ignore"}],
 		"regexp/prefer-escape-replacement-dollar-char": "error",
