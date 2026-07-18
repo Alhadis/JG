@@ -376,7 +376,17 @@
 		"spaced-comment": [
 			"error",
 			"always",
-			{"exceptions": [",", "#__PURE__", "@__PURE__"]}
+			{
+				"line": {
+					"exceptions": ["#", "-", "─", "=", "═", "━", "┅"],
+					"markers":    ["/"]
+				},
+				"block": {
+					"exceptions": [",", "#__PURE__", "@__PURE__"],
+					"markers":    ["!", "@cc_on"],
+					"balanced":   false
+				}
+			}
 		],
 		"space-before-function-paren": [
 			"error",
