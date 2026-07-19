@@ -52,6 +52,15 @@ const log = (...args) => raw
 	).join(" ") + "\n")
 	: console.log(...args);
 
+const mountError = (to, from, reason = "") => {
+	let msg = `Failed to mount ${tildify(to)} at /${from}`;
+	if(reason = `${reason}`.trim())
+		msg += ` (Reason: ${reason})`;
+	log(msg);
+	log("Command aborted.");
+	process.exit(2);
+};
+
 // Configure mount-points
 let mounts = new Map();
 const mappings = "string" === typeof options.mount ? [options.mount] : options.mount;
@@ -59,13 +68,12 @@ for(const mapping of mappings || []){
 	if(!mapping[0])
 		throw new TypeError("--mount option requires an argument");
 	let [to, ...from] = (Array.isArray(mapping) ? mapping : [mapping])[0].split(":");
-	to = path.resolve(to);
-	if(fs.existsSync(to)){
-		from = (from.join(":").replace(/^\/|\/$/g, "")) || path.basename(to);
-		log(`Mounted: ${tildify(to)} -> /${from}`);
-		mounts.set(from, to);
-	}
-	else throw new Error(`No such file or directory: ${to}`);
+	to   = path.resolve(to);
+	from = (from.join(":").replace(/^\/|\/$/g, "")) || path.basename(to);
+	fs.existsSync(to) || mountError(to, from, "No such file or directory");
+	mounts.has(from)  && mountError(to, from, "Duplicate mount-point");
+	log(`Mounted: ${tildify(to)} -> /${from}`);
+	mounts.set(from, to);
 }
 
 // Sort mount-points so that longer paths are matched first
@@ -89,7 +97,7 @@ else if(isDirectory(root))
 
 else{
 	console.error(`Not a directory: ${root}`);
-	process.exit(1);
+	process.exit(3);
 }
 
 
