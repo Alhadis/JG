@@ -1,0 +1,237 @@
+.Dd July 19, 2026
+.Dt JG 1
+.Os
+.Sh NAME
+.Nm jg
+.Nd angry bastard's toolkit
+.
+.\"=============================================================================
+.Sh SYNOPSIS
+.nf
+.Nm Ar subcommand Op Ar options
+.Nm Fl i Ar regexp Op Ar files
+.Nm Fl L Ar exts
+.Nm Fl l Oo Fl 0 Oc Ar exts
+.Nm Fl p Op Ar files
+.Nm Fl w Ar npm-modules
+.Nm Fl -version
+.Nm Fl -help
+.fi
+.
+.\"=============================================================================
+.Sh DESCRIPTION
+.Nm
+is a front-end to a suite of Node.js-based tools \
+for maintaining JavaScript projects.
+It insulates its author's chaotic workflow from the outside world,
+so that another project's build-script can run
+.Bd -literal -offset 4m
+.Nm Cm serve Fl -mount Qo Ns \(ga Ns Nm Cm where No mocha Ns \(ga Qc Pa ./src
+.Ed
+.Pp
+rather than require other users to install 10 MBs of NPM dependencies locally \
+in order to submit a pull-request.
+.
+.\"=============================================================================
+.Sh OPTIONS
+.de QQ
+.	ie t .Ql \\$*
+.	el   .Dq \\$*
+..
+.Bl -tag -width 6n
+.
+.It Fl h , -help
+Print a terse usage summary, then terminate.
+.
+.It Fl i , -in-place-edit Ar pattern Op Ar files
+Edit
+.Ar files
+in-place using a
+.Xr sed 1 Pf - No style
+.Ar pattern
+of the form
+.Sm off
+.QQ Sy / Ar search Sy / Ar replacement Sy / Ar flags .
+.Sm on
+Alias for
+.Nm Cm edit .
+.
+.It Fl L , l , -list Oo Fl 0 Oc Ar exts
+Search the current directory
+.Pq and its subdirectories
+for files that use one of the specified file extensions.
+Results are listed as absolute paths,
+one per line,
+to standard output.
+If either the
+.Fl 0
+switch or the uppercased form
+.Pq Fl L
+of this option is used,
+the list is delimited by
+.Tn ASCII Dv NUL No bytes
+instead of newlines,
+making it more suited for processing by scripts or piping to commands like
+.Dq Nm xargs Fl 0 .
+.Pp
+This feature is a more concise but limited way of calling
+.Nm Cm list ;
+use the full subcommand for complete functionality.
+.
+.It Fl p , -print-path Op Ar files
+Print the absolute path of a named file located within
+.Nm Ap s
+installation directory.
+If the user specifies no
+.Ar files ,
+then the location of the installation directory itself is printed.
+Alias for
+.Nm Cm path .
+.
+.It Fl v , -version
+Print
+.Nm Ap s
+version number,
+then terminate.
+.
+.It Fl w , -where Ar npm-modules
+Print the resolved location(s) of one or more
+.Ar npm-modules
+relative to the current working directory,
+analogous to Node.js's
+.QQ Sy require.resolve()
+function.
+Alias of
+.Nm Cm where .
+.
+.It Ar subcommand Ar args
+Execute a named
+.Ar subcommand ,
+which may be one of the following:
+.Bl -tag -offset 6n -width typewrite
+.It Cm browse
+Open a web resource in a headless browser.
+.
+.It Cm cover
+Collect, compile, and transform coverage data.
+Work in progress;
+considered experimental.
+.
+.It Cm edit
+Edit text files in-place using regular expressions.
+.
+.It Cm lint
+Lint JavaScript, TypeScript, and CoffeeScript files.
+.
+.It Cm list
+Recursively list files in a directory,
+optionally filtered by file extension or
+.Xr gitignore 5
+style pattern.
+.
+.It Cm path
+Print the resolved path of a file within
+.Nm Ap s
+installation path.
+.
+.It Cm serve
+Serve static files from a directory to the local network.
+.
+.It Cm typewrite
+Generate TypeScript declarations from JSDoc annotations.
+.
+.It Cm where
+Display the location of an installed NPM module.
+Effectively the command-line equivalent of Node's
+.QQ Sy require.resolve()
+function.
+.
+.It Cm ws
+Start a WebSocket server.
+Complements
+.Xr jg-serve 1 .
+.El
+.Pp
+For complete documentation,
+consult the man page named
+.Nm Ns Pf - Ar subcommand Ns Pq 1 .
+.El
+.
+.\"=============================================================================
+.Sh ENVIRONMENT
+.Bl -tag -width DEBUG
+.It Ev DEBUG
+If non-empty,
+enables the display of non-essential information about the \
+running command\(cqs state.
+.El
+.
+.\"=============================================================================
+.Sh EXIT STATUS
+.Ex -std
+.
+.\"=============================================================================
+.Sh SUBCOMMAND FILES
+Subcommands are executables stored in the
+.Pa ./bin
+subdirectory of
+.Nm Ap s
+installation location.
+They can be executed without using the
+.Nm
+wrapper,
+so both of the following invocations are equivalent:
+.Bd -literal -offset 4m
+.Nm Cm lint Fl -js No \&.
+.Qo Pf $ Po Nm Fl p Li bin Pc Ns /lint.mjs Qc Fl -js No \&.
+.Ed
+.Pp
+Subcommands are also useable as JavaScript libraries.
+When used in this way,
+their usual behaviour as executables is suppressed;
+for instance,
+the following script won\(cqt launch a web browser,
+as would happen if the
+.Xr jg-browse 1
+command were executed:
+.Bd -literal -offset 4m
+#!/usr/bin/env node
+.sp
+// Prints the system's installed version of Firefox
+import {find, getVersion} from "jg/bin/browse.mjs";
+const path = await find("firefox");
+if(!path){
+	console.error("Firefox is not installed");
+	process.exit(1);
+}
+const version = await getVersion(path);
+console.log("Installed Firefox version: " + version);
+.Ed
+.Pp
+Whether a subcommand is treated as an executable or like an ordinary library \
+depends on whether its path was the script originally executed by Node.js.
+Note that not every subcommand exposes a usable API this way
+.Pq and by extension, is safe for importing .
+Consult the appropriate man page first.
+.
+.\"=============================================================================
+.Sh SEE ALSO
+.Xr jg-browse 1 ,
+.Xr jg-cover 1 ,
+.Xr jg-edit 1 ,
+.Xr jg-lint 1 ,
+.Xr jg-list 1 ,
+.Xr jg-path 1 ,
+.Xr jg-serve 1 ,
+.Xr jg-typewrite 1 ,
+.Xr jg-where 1 ,
+.Xr jg-ws 1 ,
+.Xr node 1
+.
+.\"=============================================================================
+.Sh AUTHORS
+.An -nosplit
+Copyright \(co 2017\(en2026
+.An John Gardner Aq Mt gardnerjohng@gmail.com .
+Freely released under the
+.Lk http://opensource.org/licenses/ISC "ISC license" .

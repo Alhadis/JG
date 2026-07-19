@@ -1,0 +1,272 @@
+.Dd July 19, 2026
+.Dt JG-SERVE 1
+.Os
+.Sh NAME
+.Nm jg-serve
+.Nd serve static files from a directory over the local network
+.
+.\"=============================================================================
+.Sh SYNOPSIS
+.Nm
+.Op Fl IPt
+.Op Fl m Ar directory Ns Op : Ns Ar mount-point
+.Op Fl p Ar port
+.Op Ar root
+.
+.\"=============================================================================
+.Sh DESCRIPTION
+.Nm
+starts an HTTP server to share files over the host's local network.
+Files are served uncompressed and without caching,
+ideal for serving across a local network,
+but ill-suited for a production environment.
+The intended use of this command is testing websites on mobile devices \
+and running webapps that feature resources that must be served with their \
+correct media-type,
+.Pq e.g, JavaScript modules
+and due to browser sandboxing,
+cannot be loaded via the
+.Sy file://
+protocol.
+.
+.Pp
+The server runs in the foreground until it receives a
+.Dv SIGQUIT ,
+.Dv SIGTSTP ,
+.Dv SIGINT ,
+or
+.Dv SIGTERM
+signal,
+at which point it exits cleanly,
+without an error code.
+.
+.\"=============================================================================
+.Sh OPTIONS
+.Bl -tag -width 6n
+.It Fl m , Fl -mount Ar directory Ns Op : Ns Ar mount-point
+Mount a filesystem directory so its contents are accessible under the given
+.Ar mount-point
+.Po
+which defaults to
+.Ar directory Ap s
+.Xr basename 1
+if omitted
+.Pc .
+.Pp
+For example,
+to provide access to a globally-installed version of the Mocha test-runner:
+.Bd -literal -offset 4m
+.Ic eval Qq Pf $ Pq Nm jg Cm where Fl s Li chai mocha
+.Nm jg Cm serve No \e
+.D1 Fl -mount Qo Va $mocha Ns Pf : Li /libs/mocha Qc No \e
+.D1 Fl -mount Qo Va $chai  Ns Pf : Li /libs/chai  Qc No \e
+.D1 Pa ./browser-tests/
+.Ed
+.Pp
+Here,
+.Pa ./browser-tests/index.html
+is assumed to contain script tags referencing the entry-points of each library
+.Pq Note that the Pa /libs/ No directory need not exist on-disk \
+for the Fl -mount Ap d No locations to work :
+.Bd -literal -offset 4m
+<link rel="stylesheet" href="/libs/mocha/mocha.css"/>
+<script src="/libs/mocha/mocha.js"></script>
+<script src="/libs/chai/chai.js"></script>
+.Ed
+.Pp
+This option may be used multiple times,
+once for each mounted directory.
+If two mounted directories have the same
+.Ar mount-point ,
+or if the
+.Ar directory
+being mounted doesn't exist on-disk,
+.Nm
+prints an error message and quits prematurely with an exit code of 2.
+.
+.It Fl I , Fl -no-index
+Do not create HTML file listings of directories.
+Instead,
+respond with a
+.Dv 404
+status code and a short error message,
+.Dq File not found .
+.Pp
+The default behaviour is to display file listings as an HTML table,
+with each row containing a file's type
+.Pq as an icon ,
+name,
+size,
+and modification time.
+Only directories, symbolic links, and regular files are listed;
+other
+.Dq special
+filetypes like sockets and FIFOs are excluded from the index.
+Entries are listed alphabetically and case-sensitively \(`a\~la
+.Li LC_COLLATE=C ,
+with the exception that directories are grouped together at the top,
+headed by a link to the parent directory
+.Pq Dq \.\. .
+.
+.It Fl p , Fl -port Ar number
+Port number to listen on.
+Defaults to
+.Li 1337 .
+.
+.It Fl P , Fl -print-post
+Print the bodies of
+.Dv POST
+requests to standard output.
+If output is to a terminal,
+the posted data is shown underneath the request's HTTP headers,
+with C0 and C1 control characters rendered as human-readable replacements
+.Pq behaving identically to the Fl -trace No option in this regard .
+.Pp
+If output has been redirected though,
+posted data is written unmodified to stdout,
+and the server immediately exits without responding to the original request.
+This ugly hack was added as a half-arsed way to transfer files from mobile \
+without Bluetooth or uploading them to an intermediary file-hosting service.
+This feature's crass UX is intended to motivate its author to rewrite
+.Nm
+properly,
+with proper support for offloading files from mobile devices.
+.
+.It Fl t , Fl -trace
+Print the HTTP headers of each request to standard output,
+separated from one another by an empty line.
+.Pp
+If output is to a terminal,
+C0 and C1 control characters are replaced by visible counterparts,
+as though filtered through
+.Dq Nm vis Fl bc .
+.
+.It Ar root
+Path to a directory containing files to serve.
+If this argument is omitted,
+the current working directory is used instead.
+.Pp
+As a special use-case,
+.Ar root
+may be a standalone JavaScript file
+.Pq indicated by a Li .js No or Li .mjs No extension
+that runs in a generated HTML wrapper,
+with DOM construction and resource loading entrusted to the script.
+.El
+.
+.\"=============================================================================
+.Sh EXIT STATUS
+The
+.Nm
+command exits with one of the following values:
+.Pp
+.Bl -tag -width Ds -compact
+.It 0
+The server was terminated cleanly by a
+.Dv SIGQUIT ,
+.Dv SIGTSTP ,
+.Dv SIGINT ,
+or
+.Dv SIGTERM
+signal,
+or it finished writing the body of a
+.Dv POST
+request to a file if output was redirected.
+.It 1
+An uncaught and unexpected exception was raised,
+probably by the Node.js runtime itself.
+.It 2
+An invalid
+.Fl -mount
+specification was encountered during initialisation.
+Either the directory to be mounted didn't exist,
+or the mount-point was already assigned by a previous
+.Fl -mount
+option.
+.It 3
+The
+.Ar root
+argument refers to a filesystem entity that either \
+doesn't exist or isn't a directory.
+.El
+.
+.\"=============================================================================
+.Sh EXAMPLES
+Serve files from a project subdirectory named
+.Pa browser-tests
+on port 8080:
+.Dl Nm jg Cm serve Fl p Li 8080 Pa ./browser-tests
+.Pp
+Run a standalone JavaScript file as a webapp:
+.Dl Nm jg Cm serve Fl -mount Qo Pf $ Po Nm jg Cm where Li alhadis.utils Pc \
+ Ns Li /lib Ns Pf : utils Qc Pa example.mjs
+.Bd -literal -offset 6n
+// example.mjs
+import {New} from "/utils/dom.mjs";
+document.title = "Self-contained script example";
+document.body.append(
+	New("h1", {textContent: "Example webapp"}),
+	New("p",  {textContent: "BYO scripts and styles and stuff."}),
+);
+.Ed
+.
+.\"=============================================================================
+.Sh SEE ALSO
+.Xr curl 1 ,
+.Xr jg-browse 1 ,
+.Xr jg-where 1 ,
+.Xr jg-ws 1 ,
+.Xr node 1
+.
+.\"=============================================================================
+.Sh HISTORY
+The
+.Nm
+command was hacked together during a return commute in late November 2017,
+driven in large part by the revulsion its author heralded towards contemporary \
+Node.js tooling.
+Bits and pieces of functionality were added piecemeal over time,
+and it wasn't until
+.Xr jg-lint 1
+was written that a wrapper for the two tools was written and \
+a Git repository created,
+brashly named after its author's initials.
+.
+.\"=============================================================================
+.Sh AUTHORS
+.An -nosplit
+Copyright \(co 2017\(en2026
+.An John Gardner Aq Mt gardnerjohng@gmail.com .
+Freely released under the
+.Lk http://opensource.org/licenses/ISC "ISC license" .
+.
+.\"=============================================================================
+.Sh BUGS
+Media types are hardcoded
+.Pq see the Li getContentType() No function
+and determined solely by file extension.
+A more exhaustive and intelligent system should be used for identifying \
+the content-type of served files.
+.Pp
+A dedicated facility for transferring files from the client to the host needs \
+to be added; the current method of setting the
+.Fl -print-post
+switch and redirecting
+.Nm Ap s
+output to a file is plainly idiotic and unintuitive,
+not to mention time-consuming: the
+.Li multipart/form-data
+payload that's written to the filesystem requires one to untangle its contents \
+using a binary editor,
+as the combination of
+.Tn ASCII
+and binary data makes splitting on boundary strings in JavaScript unfeasible.
+A rewrite is already in the works on a detached branch at GitHub.
+.Pp
+The code for mapping requests to files and/or redirects is a confusing mess.
+It's also inflexible;
+a configurable mechanism for URL routing should be provided.
+.Pp
+JavaScript files used as entry-points should have a predefined
+.Vt argv
+global populated by the URL's query variables.
