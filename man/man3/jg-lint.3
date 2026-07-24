@@ -1,0 +1,490 @@
+.Dd July 24, 2026
+.Dt JG-LINT 3
+.Os
+.Sh NAME
+.Nm jg-lint
+.Nd functions for linting JavaScript, TypeScript and CoffeeScript
+.ft R
+.if \n(.f=0 .nr is-mandoc 1
+.
+.\"=============================================================================
+.Sh SYNOPSIS
+.Bd -literal
+.Ic import Bro
+.Bd -unfilled -offset 4n -compact
+.Sy lint ,
+.Sy run ,
+.Sy lintJavaScript ,
+.Sy lintTypeScript ,
+.Sy lintCoffeeScript ,
+.Sy findFlatESLintConfig ,
+.Sy resolveFileList ,
+.Ed
+.if !\n[is-mandoc]=1 .sp
+.Brc Ic from Qq Pa jg/bin/lint.mjs ;
+.Ed
+.
+.\"=============================================================================
+.Sh DESCRIPTION
+.ds CR \fR
+.ds CB \fB
+.ds CI \fI
+.if !\n[is-mandoc]=1 \{\
+.	do if F CR .ds CR \f(CR
+.	do if F CB .ds CB \f(CB
+.	do if F CI .ds CI \f(CI
+.\}
+.ds =  \*(CR=\fP
+.ds {} \*(CB{}\fP
+.ds [] \*(CB[]\fP
+.
+.\" Document a function
+.de FUNCTION
+.	END
+.	Pp
+.	nr js-func-def 1
+.	ds js-func-type function
+.	ie        '\\$1'-async*' .ds js-func-type async function*
+.	el \{ .ie '\\$1'-async'  .ds js-func-type async function
+.	el \{ .ie '\\$1'-*'      .ds js-func-type function*
+.	\}\}
+.	ie !'\\*[js-func-type]'function' \{\
+.		Tg \\$2
+.		Ft \\*[js-func-type]
+.		shift
+.	\}
+.	el \{\
+.		Tg \\$1
+.		Ft "function"
+.	\}
+.	rm js-func-type
+.	Fo \\$1
+.	shift
+.	Fa \\$@
+.	Fc
+.	Bd -filled -offset 6n -compact
+..
+.\" Manually end the current function definition section
+.de END
+.	if \\n[js-func-rv]>0  .Ed
+.	if \\n[js-func-def]>1 .El
+.	if \\n[js-func-def]>0 .Ed
+.	rr js-func-def
+.	rr js-func-rv
+..
+.\" Document a function's return value
+.de RV
+.	Pp
+.	Sy Return value :
+.	ie \\w'\\$2'>0 \{\
+.		Sm off
+.		Vt \\$1 Ns Eo < Vt \\$2 Ec >
+.		Sm on
+.	\}
+.	el .Vt \\$1
+.	Bd -filled -offset 4n -compact
+.	nr js-func-rv 1
+..
+.\" Begin a function's parameters list
+.de PARAMETERS
+.	if \\n[js-func-rv]>0 \{\
+.		Ed
+.		rr js-func-rv
+.	\}
+.	Pp
+.	Sy Parameters :
+.	Bl -tag -width 4n -offset 4n -compact
+.	nr js-func-def 2
+..
+.\" Document a function parameter
+.de PARAM
+.	It Bro Vt \\$1 Brc Xo
+.	ie ''\\$3' .Fa \\$2
+.	el \{\
+.		ie '\&'\\$3' .Op Fa \\$2
+.		el           .Op Fa "\\$2 \\*= \\*(CB\\$3\fP"
+.	\}
+.	Xc
+.	ad l
+..
+.\" Typeset the given arguments, double-quoting them for terminal display
+.de QQ
+.	ie t .Ql \\$*
+.	el   .Dq \\$*
+..
+.\" Emphasise the arguments without resorting to underlining
+.de EM
+.	ie t .Em \\$*
+.	el   *\\$**
+..
+.\" Document-specific macros:
+.de OPT.WARNINGS
+.	PARAM Boolean options.warnings \&
+.	nop Display warning-level messages from
+.	ie '\\$1'' .nop ESlint.
+.	el         .nop \\$1.
+.	nop By default, only errors are displayed.
+..
+.de OPT.FATALWARN
+.	PARAM Boolean options.fatalWarnings \&
+.	nop Same as
+.	Fa options.warnings ,
+.	nop but warnings are treated with the same severity as errors,
+.	nop and will thus cause
+.	ie '\\$1'' .nop ESLint
+.	el         .nop \\$1
+.	nop to exit with an error code when emitted.
+..
+.de OPT.RUN-SUPERSET
+.	nop Hash of options influencing the execution of
+.	ie '\\$1'' .nop ESLint.
+.	el         .nop \\$1.
+.	nop These include those accepted by the homonymous parameter of the
+.	Fn run
+.	nop function, as well as those that follow:
+..
+.
+The following functions are exported by
+.Pa bin/lint.mjs ,
+located in
+.Nm jg Ap s
+installation directory.
+.
+.FUNCTION -async lint paths "options \*= \*({}"
+Scan a list of directories for lintable files,
+collate the results,
+and pass them to their respective linter(s).
+.Pp
+.Sy NB :
+This function will terminate the running process upon an error!
+.RV Promise void
+.PARAMETERS
+.PARAM String[] paths
+Directories to scan, or individual files to lint.
+.PARAM Object options \*({}
+Hash of settings controlling lint behaviour.
+Each setting corresponds to a command-line switch set by the
+.Nm
+command.
+.PARAM Boolean options.js \&
+Enable JavaScript linting using the
+.Fn lintJavaScript
+function.
+Corresponds to the
+.Fl j
+flag.
+.PARAM Boolean options.ts \&
+Enable TypeScript linting using the
+.Fn lintTypeScript
+function.
+Corresponds to the
+.Fl t
+flag.
+.PARAM Boolean options.coffee \&
+Enable CoffeeScript linting using the
+.Fn lintCoffeeScript
+function.
+Corresponds to the
+.Fl c
+flag.
+.PARAM Boolean options.atom \&
+Use ESLint config for Atom projects.
+Corresponds to the
+.Fl a
+flag.
+.PARAM Boolean options.babel \&
+Enable Babel transpilation in ESLint.
+Corresponds to the
+.Fl b
+flag.
+.PARAM Boolean options.es5 \&
+Use ESLint config for ECMAScript 5 syntax.
+Corresponds to the
+.Fl 5
+flag.
+.PARAM Boolean options.mw \&
+Use ESLint config for MediaWiki user scripts.
+Corresponds to the
+.Fl m
+flag.
+.PARAM Boolean options.fatalWarnings \&
+Treat warning-level messages as errors.
+Corresponds to the
+.Fl W
+flag.
+.PARAM Boolean options.warnings \&
+Enable non-fatal lint messages.
+Corresponds to the
+.Fl w
+flag.
+.PARAM Boolean options.ignoreConfig \&
+Disregard ESLint configs in current directory.
+Corresponds to the
+.Fl C
+flag.
+.PARAM String options.eslintOptions \&
+Quoted list of arbitrary ESLint options.
+Corresponds to the
+.Fl E
+flag.
+.
+.if t .bp
+.FUNCTION -async run cmd args "options \*= \*({}"
+Execute a command by name.
+.RV Promise Number
+Resolves with the command's exit code.
+.PARAMETERS
+.PARAM String cmd
+Executable's name.
+.PARAM String[] args
+Arguments list.
+.PARAM Object options \*({}
+Hash containing additional options.
+.PARAM Object options.env \*({}
+Hash containing environment variables to set in subprocess.
+.PARAM Boolean options.echo false
+If true, echo the command to standard error.
+.PARAM String|String[] options.stdio \(dqinherit\(dq
+I/O configuration used by Node.js when spawning subprocesses.
+Meaningful values are
+.Li \(dqpipe\(dq ,
+.Li \(dqoverlapped\(dq ,
+.Li \(dqignore\(dq ,
+and
+.Li \(dqinherit\(dq Pq the default .
+Alternatively,
+a 3-element array of the aforementioned strings may be used instead,
+with each entry corresponding to the subprocess's standard input,
+standard output,
+and standard error streams.
+For more detailed information on subprocess I/O,
+consult the
+.ie t .Lk https://nodejs.org/api/child_process.html#optionsstdio "relevant section"
+.el   relevant section
+in Node.js's documentation on child processes.
+.PARAM String options.input \&
+Text to write to the subcommand's standard input.
+If a non-empty string is given,
+the first element of
+.Fa options.stdio
+is set to
+.Li \(dqpipe\(dq
+by necessity.
+.PARAM Function options.output \&
+Callback fired after
+.Fa cmd
+has completed,
+successfully or otherwise.
+The function is called with a single
+.Li Buffer
+object containing the entirety of the command's standard output.
+The presence of this option necessarily sets the second element of
+.Fa options.stdio
+to
+.Li \(dqpipe\(dq .
+.
+.FUNCTION -async lintJavaScript files "options \*= \*({}"
+Run ESLint on the specified
+.Fa files .
+Assumes that the
+.QQ eslint
+command is reachable from the user's
+.Ev PATH .
+.RV Promise Number
+Resolves with the exit code returned by ESLint.
+.PARAMETERS
+.PARAM String[] files
+List of pathnames resolved by
+.Fn resolveFileList .
+Paths may point to directories or individual files.
+.PARAM Object options \*({}
+.OPT.RUN-SUPERSET
+.PARAM Boolean options.atom \&
+Use a base configuration optimised for Atom projects.
+Mutually exclusive with
+.Fa options.babel ,
+.Fa options.es5 ,
+and
+.Fa options.mw .
+.PARAM Boolean options.babel \&
+Use a base configuration that enables Babel transpilation.
+Mutually exclusive with
+.Fa options.atom ,
+.Fa options.es5 ,
+and
+.Fa options.mw .
+.PARAM Boolean options.es5 \&
+Use a base configuration optimised for ECMAScript\~5 syntax.
+Mutually exclusive with
+.Fa options.atom ,
+.Fa options.babel ,
+and
+.Fa options.mw .
+.PARAM Boolean options.mw \&
+Use a base configuration optimised for MediaWiki user scripts.
+Mutually exclusive with
+.Fa options.atom ,
+.Fa options.babel ,
+and
+.Fa options.es5 .
+.OPT.WARNINGS
+.OPT.FATALWARN
+.PARAM Boolean options.ignoreConfig \&
+Ignore whatever ESLint configs are in the working directory,
+if any.
+.PARAM String options.eslintOptions \&
+Arbitrary options passed to ESLint.
+Note that because the options are
+.EM prepended
+to the options list of the executed command,
+they have
+.EM lower
+precedence than those set by other parameters listed herein.
+.
+.FUNCTION -async lintTypeScript files "options \*= \*({}"
+Run ESLint with TypeScript-specific linting rules on the specified
+.Fa files .
+Assumes that the
+.QQ eslint
+command is reachable from the user's
+.Ev PATH .
+.RV Promise Number
+Resolves with the exit code reported by ESLint.
+.PARAMETERS
+.PARAM String[] files
+List of pathnames resolved by
+.Fn resolveFileList .
+Paths may point to directories or individual files.
+.PARAM Object options \*({}
+.OPT.RUN-SUPERSET
+.OPT.WARNINGS
+.OPT.FATALWARN
+.
+.FUNCTION -async lintCoffeeScript files "options \*= \*({}"
+Run CoffeeLint on the specified
+.Fa files .
+Assumes that the
+.QQ coffeelint
+command is reachable from the user's
+.Ev PATH .
+.Pp
+.Sy NB :
+Avoid passing directories which contain
+.Ql node_modules
+folders; CoffeeLint won't ignore them by default.
+Provide a list of specific file paths instead.
+.RV Promise Number
+Resolves with the exit code reported by CoffeeLint.
+.PARAMETERS
+.PARAM String[] files
+List of pathnames resolved by
+.Fn resolveFileList .
+Paths may point to directories or individual files,
+though the latter is preferred for reasons discussed above.
+.PARAM Object options \*({}
+.OPT.RUN-SUPERSET CoffeeLint
+.OPT.WARNINGS CoffeeLint
+.OPT.FATALWARN CoffeeLint
+.
+.FUNCTION findFlatESLintConfig "from \*= \*(CBprocess.cwd()\fP"
+Search a directory and its ancestors for a flat ESLint config.
+Flat ESLint configs are those named
+.QQ eslint.config.js ,
+.QQ eslint.config.mjs ,
+or
+.QQ eslint.config.cjs .
+.Pp
+If
+.Ev ESLINT_USE_FLAT_CONFIG
+is set to the string
+.QQ false
+in the environment,
+the function immediately returns
+.Dv null
+without consulting the filesystem.
+.RV Promise ?String
+Returns either the absolute path of a config file, or
+.Dv null
+if one couldn't be found.
+.Pp
+Results are cached in a null-prototype object stored \
+on the function object itself
+.Pq accessed via the Do Li .cache Dc No property .
+To clear a cached result and force the next call to
+.Fn findFlatESLintConfig
+to rescan the filesystem, use
+.Dl Ic delete Sy findFlatESLintConfig.cache Ns Bq Fa from ;
+Alternatively, to clear
+.EM all
+cached lookups, use
+.Dl Ic delete Sy findFlatESLintConfig.cache ;
+Be aware that the
+.Ql .cache
+property will still be recreated upon the next call.
+.PARAMETERS
+.PARAM String from \*(CBprocess.cwd()\fP
+Initial directory to begin search from.
+Defaults to the current working directory.
+.
+.FUNCTION resolveFileList paths extMatch "isolate \*= \*([]"
+Reduce a list of files to a common root directory.
+.Pp
+Filenames which don't end in an extension matched by
+.Fa extMatch
+are included as-is;
+it's assumed these are executables without an extension that are \
+recognised by the respective linter.
+.Pp
+Any paths listed in
+.Fa isolate
+are excluded for the purposes of determining a shared base directory.
+.RV String[]
+.PARAMETERS
+.PARAM String[] paths
+.PARAM RegExp extMatch
+.PARAM String[] isolate \*([]
+.
+.END
+.\"=============================================================================
+.\" Author's note: Keep section in-sync with jg-lint(1)'s "ENVIRONMENT" section
+.Sh ENVIRONMENT
+.Bl -tag -width 4n
+.It Ev DEBUG
+If non-empty,
+enables the display of non-essential information about the \
+running command\(cqs state.
+.It Ev ESLINT_USE_FLAT_CONFIG
+If set to
+.QQ false ,
+prevents ESLint from using flat configuration files
+.Pq Pa eslint.config.\& Ns Brq Ns Pa js , Ns Pa mjs , Ns Pa cjs
+in the current directory or one of its ancestors.
+.It Ev FORCE_COLOR
+Force ANSI-coloured output when output is redirected.
+By default,
+coloured output is only used if standard output is connected to a terminal; \
+setting this environment variable to a supported value
+.Po
+.QQ 1 ,
+.QQ 2 ,
+.QQ 3 ,
+.QQ true ,
+or the empty string
+.Pc ,
+will force colourised output irrespective of redirection.
+See
+.Xr node 1
+for the meanings of the aforementioned values.
+.El
+.
+.\"=============================================================================
+.Sh SEE ALSO
+.Xr jg-lint 1
+.
+.\"=============================================================================
+.Sh AUTHORS
+.An -nosplit
+Copyright \(co 2018\(en2026
+.An John Gardner Aq Mt gardnerjohng@gmail.com .
+Freely released under the
+.Lk http://opensource.org/licenses/ISC "ISC license" .

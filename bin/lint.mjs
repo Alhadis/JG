@@ -38,6 +38,28 @@ if(process.argv[1] === path || globalThis.$0 === path){
 }
 
 
+/**
+ * Scan a list of directories for lintable files, collate the
+ * results, and pass them to their respective linter(s).
+ *
+ * NB: This function will terminate the running process upon an error!
+ *
+ * @param {String[]} paths - Directories to scan, or individual files to lint
+ * @param {Object}  [options] - Hash of settings controlling lint behaviour
+ * @param {Boolean} [options.js] - Enable JavaScript linting
+ * @param {Boolean} [options.ts] - Enable TypeScript linting
+ * @param {Boolean} [options.coffee] - Enable CoffeeScript linting
+ * @param {Boolean} [options.atom] - Use ESLint config for Atom projects
+ * @param {Boolean} [options.babel] - Enable Babel transpilation in ESLint
+ * @param {Boolean} [options.es5] - Use ESLint config for ECMAScript 5 syntax
+ * @param {Boolean} [options.mw] - Use ESLint config for MediaWiki user scripts
+ * @param {Boolean} [options.fatalWarnings] - Treat warning-level messages as errors
+ * @param {Boolean} [options.warnings] - Enable non-fatal lint messages
+ * @param {Boolean} [options.ignoreConfig] - Disregard ESLint configs in current directory
+ * @param {String}  [options.eslintOptions] - Quoted list of arbitrary ESLint options
+ * @returns {void}
+ * @internal
+ */
 export async function lint(paths, options = {}){
 	options = {...options}; // Avoid modifying by reference
 	paths = paths.filter(Boolean).map(path => resolve(path));
@@ -177,11 +199,11 @@ export async function run(cmd, args, options = {}){
  * Run `eslint` on the specified file paths.
  *
  * @param {String[]} files - Resolved pathnames
- * @param {Object} options - Options hash
+ * @param {Object} [options={}] - Options hash
  * @return {Number} Exit code returned by ESLint
  * @internal
  */
-export async function lintJavaScript(files, options){
+export async function lintJavaScript(files, options = {}){
 	const env = findFlatESLintConfig() ? {ESLINT_USE_FLAT_CONFIG: false} : undefined;
 	const args = ["--ext", "cjs,mjs,js", "--", ...files];
 	const base = (
@@ -230,7 +252,9 @@ export async function lintJavaScript(files, options){
 	
 	// Lastly, allow arbitrary options to be passed directly to ESLint
 	if(options.eslintOptions){
-		const extraOpts = splitStrings(options.eslintOptions);
+		const extraOpts = "string" === typeof options.eslintOptions
+			? splitStrings(options.eslintOptions)
+			: options.eslintOptions.map(String);
 		+process.env.DEBUG && console.log(`Prepending options: ${extraOpts}`);
 		args.unshift(...extraOpts);
 	}
@@ -249,11 +273,11 @@ export async function lintJavaScript(files, options){
  * Run `eslint` with TypeScript-specific linting rules.
  *
  * @param {String[]} files - Resolved pathnames
- * @param {Object} options - Options hash
+ * @param {Object} [options={}] - Options hash
  * @return {Number} Exit code reported by ESLint
  * @internal
  */
-export async function lintTypeScript(files, options){
+export async function lintTypeScript(files, options = {}){
 	const configFile = getPath("eslint/typescript");
 	const args = ["--config", configFile, "--", ...files];
 	const env = findFlatESLintConfig() ? {ESLINT_USE_FLAT_CONFIG: false} : undefined;
@@ -271,11 +295,11 @@ export async function lintTypeScript(files, options){
  * list of specific file paths instead.
  *
  * @param {String[]} files - Resolved pathnames
- * @param {Object} options - Options hash
+ * @param {Object} [options={}] - Options hash
  * @return {Number} Exit code reported by CoffeeLint
  * @internal
  */
-export async function lintCoffeeScript(files, options){
+export async function lintCoffeeScript(files, options = {}){
 	const configFile = getPath("coffeelint.json");
 	const args = ["--ext", "cson", "-f", configFile, ...files];
 	

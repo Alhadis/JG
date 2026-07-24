@@ -1,0 +1,315 @@
+.Dd July 19, 2026
+.Dt JG-LINT 1
+.Os
+.Sh NAME
+.Nm jg-lint
+.Nd lint JavaScript, TypeScript, and CoffeeScript files
+.
+.\"=============================================================================
+.Sh SYNOPSIS
+.Nm
+.Op Fl 5CWabcjmqtw
+.Op Fl E Ar eslint-options
+.Op Ar paths
+.
+.\"=============================================================================
+.Sh DESCRIPTION
+.de QQ
+.	ie t .Ql \\$*
+.	el   .Dq \\$*
+..
+.Nm
+is a wrapper for linting JavaScript projects,
+or those written in languages that transpile to JavaScript
+.Pq specifically, TypeScript and CoffeeScript .
+Its main job is to ensure that the linter programs it executes use the configs \
+bundled with
+.Nm ,
+irrespective of the current working directory.
+Commands executed by
+.Nm
+are echoed to the standard error stream unless the
+.Fl q
+flag is passed;
+linting stops with the first command that exits with a non-zero status.
+.Pp
+By default,
+.Nm
+scans the current working directory for files it recognises as lintable.
+A list of
+.Ar paths
+may be specified instead,
+which either point to directories to scan,
+or individual files to lint.
+.
+.\"=============================================================================
+.Sh OPTIONS
+.ds eslint-version v8.57.1
+.Ss Linter selection
+.Bl -tag -width 6n
+.It Fl j , Fl -js
+Enable JavaScript linting.
+Requires ESLint \*[eslint-version].
+.
+.It Fl t , Fl -ts
+Enable TypeScript linting.
+Requires ESLint \*[eslint-version];
+prior to January 18, 2024,
+the long-obsolete TSLint was required instead.
+.
+.It Fl c , Fl -coffee
+Enable CoffeeScript linting.
+Requires CoffeeLint v2.1.0.
+.Pp
+.Sy Nota bene :
+that due to the obsolescence of CoffeeScript in favour of TypeScript \
+and modern JavaScript,
+CoffeeLint isn't installed as a dependency of
+.Xr jg 1
+by
+.Xr npm 1 ,
+and thus needs to be installed manually.
+This is unlikely to impact contributors on most projects;
+support for CoffeeScript linting was originally added as a means of enforcing \
+indentation and formatting style in CSON
+.Pq CoffeeScript Object Notation
+files,
+which remain in widespread use for authoring TextMate-compatible grammars.
+.Nm
+no longer scans for
+.Li .cson
+files linting CoffeeScript,
+due to the limitations of CoffeeLint making it inadequate for accommodating \
+the formatting style employed by the author when penning TextMate-compatible \
+grammars.
+.El
+.Pp
+If none of the above options are given,
+then
+.Nm
+lints everything it has a linter for:
+JavaScript,
+TypeScript,
+and CoffeeScript
+.Pq in that order .
+.
+.Ss General options
+.Bl -tag -width 6n
+.It Fl q , Fl -no-echo
+Don't print external commands as they're executed.
+.
+.It Fl w , Fl -warnings
+Enable lint warnings
+.Pq ignorable messages about Em potential No issues
+in addition to errors
+.Pq messages about issues that require fixing .
+By default,
+.Nm
+only displays error-level messages.
+.
+.It Fl W , Fl -fatal-warnings
+Same as the
+.Fl w
+switch described above,
+only warnings are treated as errors,
+and will thus cause
+.Nm
+to exit with a non-zero status.
+.El
+.
+.Ss ESLint options
+.Bl -tag -width 6n
+.It Fl 5 , Fl -es5
+Run ESLint with settings optimised for ECMAScript\~5 syntax.
+.
+.It Fl a , Fl -atom
+Run ESLint with settings optimised for Atom projects.
+.
+.It Fl b , Fl -babel
+Run ESLint with Babel transpilation.
+Necessary for projects that utilise cutting-edge ECMAScript features.
+.
+.It Fl C , Fl -ignore-config
+Ignore whatever ESLint configs are in the working directory,
+even those that extend
+.Sy @alhadis/eslint-config
+.Pq the base configuration file bundled with Nm jg .
+.
+.It Fl E , Fl -eslint-options Ar opts
+Arbitrary options prepended to the argument list ESLint is called with.
+The
+.Ar opts
+value is a quoted list of shell-compatible options passed without \
+interpretation to the ESLint command.
+For example:
+.Bd -literal -offset 4m
+.Nm jg Cm lint Fl -js Fl E Qo \
+--global=EAL --parser-options ecmaVersion:2019 \
+ Qc Pa ./eal/lib/*.mjs
+.Ed
+.
+.It Fl m , Fl -mw
+Run ESLint with settings optimised for MediaWiki user scripts.
+.El
+.
+.\"=============================================================================
+.Sh ENVIRONMENT
+.Bl -tag -width 4n
+.It Ev DEBUG
+If non-empty,
+enables the display of non-essential information about the \
+running command\(cqs state.
+.It Ev ESLINT_USE_FLAT_CONFIG
+If set to
+.QQ false ,
+prevents ESLint from using flat configuration files
+.Pq Pa eslint.config.\& Ns Brq Ns Pa js , Ns Pa mjs , Ns Pa cjs
+in the current directory or one of its ancestors.
+.It Ev FORCE_COLOR
+Force ANSI-coloured output when output is redirected.
+By default,
+coloured output is only used if standard output is connected to a terminal; \
+setting this environment variable to a supported value
+.Po
+.QQ 1 ,
+.QQ 2 ,
+.QQ 3 ,
+.QQ true ,
+or the empty string
+.Pc ,
+will force colourised output irrespective of redirection.
+See
+.Xr node 1
+for the meanings of the aforementioned values.
+.El
+.
+.\"=============================================================================
+.Sh FILES
+.ds coffee-config etc/coffeelint.json
+The following file paths are relative to
+.Nm jg Ap s
+installation directory.
+.
+.Bl -tag -width 4n
+.It Pa eslint/.eslintrc.json
+The base ESLint configuration used for linting JavaScript by default.
+.It Pa eslint/atom.js
+An extension of
+.Pa .eslintrc.json
+optimised for linting Atom projects.
+Enabled by the
+.Fl a
+switch.
+.It Pa eslint/babel.js
+An extension of
+.Pa .eslintrc.json
+that enables Babel transpilation in ESLint.
+Enabled by the
+.Fl b
+switch.
+.It Pa eslint/es5.json
+An extension of
+.Pa .eslintrc.json
+optimised for linting ECMAScript\~5 syntax.
+Enabled by the
+.Fl 5
+switch.
+.It Pa eslint/mw.js
+An extension of
+.Pa eslint/es5.json
+optimised for linting ResourceLoader-friendly MediaWiki scripts.
+Enabled by the
+.Fl m
+switch.
+.It Pa eslint/typescript.json
+An extension of
+.Pa .eslintrc.json
+designed for linting TypeScript files,
+including declaration files
+.Pq those ending in Li .d.ts .
+Enabled automatically by the
+.Fl t
+flag.
+.It Pa eslint/typescript.full.json
+An extension of
+.Pa eslint/typescript.json
+with more elaborate rules for linting TypeScript files.
+Not used by default because the TypeScript files normally linted by
+.Nm
+are declaration files,
+as this author rarely programs in TypeScript.
+No switch exists to enable this config from the command-line;
+its usage requires a project's local
+.Pa .eslintrc.json
+file to extend
+.Sy @alhadis/eslint-config/typescript.full .
+.It Pa \*[coffee-config]
+Configuration file used by CoffeeLint for linting CoffeeScript files.
+.El
+.
+.\"=============================================================================
+.Sh EXIT STATUS
+.Ex -std
+Typically,
+this will be the error code returned by a linter \
+which reported one or more problems.
+However,
+an error code of 1 is returned if required linter(s) aren't installed
+.Pq or Do reachable Dc from the user's Ev PATH .
+.
+.\"=============================================================================
+.Sh SEE ALSO
+.Xr jg 1 ,
+.Xr jg-lint 3
+.
+.\"=============================================================================
+.Sh HISTORY
+.Nm
+was written out of need for a JavaScript-based wrapper that would correctly \
+call the appropriate linter programs with the author's preferred configuration.
+A shell-script was insufficient,
+as the linters in question needed to run on Windows-based systems
+.Pq primarily as automated tasks running on CI services like Appveyor .
+The aforementioned configuration files would later be bundled alongside
+.Nm ,
+situated in a separate directory from which new releases of a \
+shareable ESLint config could be published,
+albeit without an accompanying
+.Xr git-tag 1 .
+This shareable config was originally published to NPM out of necessity,
+albeit reluctantly,
+after ESLint deprecated the use of
+.Dq personal
+config files \(en ones located in the user's home directory
+.Pq Pa ~/.eslintrc ,
+which ESLint formerly loaded in addition to project-specific configurations.
+.
+.\"=============================================================================
+.Sh AUTHORS
+.An -nosplit
+Copyright \(co 2018\(en2026
+.An John Gardner Aq Mt gardnerjohng@gmail.com .
+Freely released under the
+.Lk http://opensource.org/licenses/ISC "ISC license" .
+.
+.\"=============================================================================
+.Sh BUGS
+TypeScript linting doesn't support the
+.Fl -eslint-options
+or
+.Fl -ignore-config
+options;
+there's no reason these should affect JavaScript linting only.
+.Pp
+ESLint should be made to respect the
+.Ev NO_COLOR
+environment variable in the absence of
+.Ev FORCE_COLOR .
+.Pp
+CoffeeLint's
+.QQ colon_assignment_spacing
+rule expects a fixed number of spaces,
+which makes it impossible to vertically-align similar statements across lines; \
+a custom rule should be written for
+.Pa \*[coffee-config]
+that supports a variable number of spaces.
