@@ -1,0 +1,220 @@
+.Dd July 25, 2026
+.Dt JG-LIST 1
+.Os
+.Sh NAME
+.Nm jg-list
+.Nd recursively list files in a directory
+.
+.\"=============================================================================
+.Sh SYNOPSIS
+.Nm jg
+.Cm list
+.Op Fl e Ar extensions
+.Op Fl i Ar ignore-pattern
+.Op Fl 0
+.Op Ar paths
+.
+.\"=============================================================================
+.Sh DESCRIPTION
+.de QQ
+.	ie t .Ql \\$*
+.	el   .Dq \\$*
+..
+.Nm
+recurses through one or more directories and lists \
+their contents to standard output,
+sorted alphabetically and depth-first.
+Results are separated by either
+.Tn ASCII Dv NUL No bytes
+.Pq if the Fl 0 No switch is used
+or newlines.
+The command is analogous to the POSIX command
+.Xr find 1 ,
+except its output is ordered depth-first
+.Pq directories listed before their contents ,
+results are printed as resolved paths,
+and symbolic links are never followed.
+Moreover,
+the subcommand works on Windows platforms,
+and it offers a much more concise syntax,
+albeit with far fewer bells and whistles.
+.Pp
+An alias of this command is supported when invoked via the
+.Xr jg 1
+wrapper
+.Pq Ql Nm jg Cm ls ,
+though its use is discouraged,
+as it exists solely to alleviate the frustrations of users \
+whose muscle-memory is conditioned to type
+.QQ ls
+instead of
+.QQ list .
+This is concession is handled solely by the
+.Xr jg 1
+front-end;
+no accompanying
+.Pa bin/ls.mjs
+file exists,
+not even as a symbolic link.
+.
+.\"=============================================================================
+.Sh OPTIONS
+.Bl -tag -width 6n
+.It Fl e , -extensions Ar list
+Print only those results whose
+.Xr basename 3
+ends in one of the specified file extensions.
+The
+.Ar list
+is separated by commas and/or whitespace,
+and extensions may be specified with or without a leading dot.
+This option may be used multiple times.
+.
+.It Fl i , -ignore Ar pattern
+Filter out results whose paths match the given
+.Ar pattern ,
+which is a regular expression of the form
+.Sm off
+.Qq Sy "(?" Ar flags Sy \&) Ar source ,
+.Sm on
+used in JavaScript as
+.Ql Ic new Cm RegExp Ns Pq Ar source , flags .
+By default,
+files named
+.Li .git
+or
+.Li node_modules
+are excluded from searches.
+.Pp
+This option may be used multiple times;
+if so,
+paths need only match one of the given
+.Ar patterns
+to be filtered from the output.
+.
+.It Fl m , -match Ar pattern
+Filter results whose paths match the given
+.Ar pattern .
+Thi is the logical inverse of
+.Fl -ignore ,
+and may be used in conjunction with
+.Fl -extensions .
+Like
+.Fl -ignore ,
+the
+.Fl -match
+option may be used multiple times;
+unlike its counterpart,
+.Em all
+patterns must match a path for it to survive filtration.
+This is in addition to matching any file extensions specified by
+.Fl e .
+.
+.It Fl 0
+Separate results with
+.Tn ASCII Dv NUL No bytes
+instead of newlines,
+suitable for consumption by
+.Dq Nm xargs Fl 0 .
+.
+.It Ar paths
+A list of directories to search.
+If no
+.Ar paths
+are specified,
+the current working directory is searched instead.
+Note that symbolic links will
+.Em not
+be followed.
+.El
+.
+.\"=============================================================================
+.Sh EXIT STATUS
+.Bl -tag -width 4n -compact
+.It 0
+Successful execution.
+.It 1
+No matching files were found.
+.It 2
+One or more of the search
+.Ar paths
+referenced a non-existent resource,
+or one that isn't a directory.
+.It 3
+Some other,
+unaccounted for exception occurred.
+.El
+.
+.\"=============================================================================
+.Sh EXAMPLES
+List image files in the directory
+.Pa docs :
+.Dl Nm jg Cm list \
+ Fl e Ar jpeg,jpg \
+ Fl e Ar png \
+ Fl Ar e gif \
+ Fl Ar e webp \
+ Fl Ar e bmp \
+ Ar ./docs
+.Pp
+List JavaScript files in current working directory,
+excluding those in the
+.Pa build
+and
+.Pa coverage
+directories:
+.Dl Nm jg Cm list \
+ Fl e Ar js,mjs,cjs \
+ Fl i No \(aq Ns Ar (?i)(?:^|/)(build|coverage)$ Ns No \(aq
+.Pp
+Report problematic filenames
+.Pq those with contain embedded newlines :
+.Dl Nm jg Cm list Fl 0m Qo Ar \en Qc | \
+ Nm xargs Fl 0n Ns Ar 1 \
+ Nm printf Qo File contains illegal character: %s\en Qc
+.
+.\"=============================================================================
+.Sh SEE ALSO
+.Xr find 1 ,
+.Xr jg 1 ,
+.Xr ls 1 ,
+.Xr xargs 1 ,
+.Xr jg-list 3
+.
+.\"=============================================================================
+.Sh HISTORY
+The core logic of
+.Nm
+was originally written as part of
+.Xr jg-lint 1 .
+It was split into its own subcommand on January 24, 2019.
+On December 22, 2019,
+the command's
+.Fn ls
+function,
+which handled the heavy lifting of recursive directory traversal,
+was moved to the
+.Lk "https://github.com/Alhadis/Utils" "utility library"
+that
+.Nm jg
+already had a runtime dependency on.
+.
+.\"=============================================================================
+.Sh AUTHORS
+.An -nosplit
+Copyright \(co 2019\(en2026
+.An John Gardner Aq Mt gardnerjohng@gmail.com .
+Freely released under the
+.Lk http://opensource.org/licenses/ISC "ISC license" .
+.
+.\"=============================================================================
+.Sh BUGS
+Symbolic links specified on the command-line should be dereferenced.
+Moreover, an option to follow symlinks should be provided,
+given that the
+.Fn ls
+function powering this command already supports such a feature.
+.Pp
+An option to filter results by filesystem type
+.Pq socket, FIFO, character or block device, regular file, etc
+needs to be provided.

@@ -8,8 +8,12 @@
 	"man": [
 		"man/man1/jg.1",
 		"man/man1/jg-lint.1",
+		"man/man1/jg-list.1",
+		"man/man1/jg-ls.1",
 		"man/man1/jg-serve.1",
 		"man/man3/jg-lint.3",
+		"man/man1/jg-list.3",
+		"man/man1/jg-ls.3",
 		"man/man5/jg-pack.5"
 	],
 	"engines": {"node": ">=13.2.0"},

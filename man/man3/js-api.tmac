@@ -1,0 +1,109 @@
+.ds CR \fR
+.ds CB \fB
+.ds CI \fI
+.if !\n[is-mandoc]=1 \{\
+.	do if F CR .ds CR \f(CR
+.	do if F CB .ds CB \f(CB
+.	do if F CI .ds CI \f(CI
+.\}
+.ds =  \*(CR=\fP
+.ds {} \*(CB{}\fP
+.ds [] \*(CB[]\fP
+.ds .. ...
+.if '\*(.T'utf8' .ds .. \[u2026]
+.
+.\" Document a function
+.de FUNCTION
+.	END
+.	Pp
+.	nr js-func-def 1
+.	ds js-func-type function
+.	ie        '\\$1'-async*' .ds js-func-type async function*
+.	el \{ .ie '\\$1'-async'  .ds js-func-type async function
+.	el \{ .ie '\\$1'-*'      .ds js-func-type function*
+.	\}\}
+.	ie !'\\*[js-func-type]'function' \{\
+.		Tg \\$2
+.		Ft \\*[js-func-type]
+.		shift
+.	\}
+.	el \{\
+.		Tg \\$1
+.		Ft "function"
+.	\}
+.	rm js-func-type
+.	Fo \\$1
+.	shift
+.	Fa \\$@
+.	Fc
+.	Bd -filled -offset 6n -compact
+..
+.\" Manually end the current definition section
+.de END
+.	if \\n[js-func-rv]>0  .Ed
+.	if \\n[js-func-def]>1 .El
+.	if \\n[js-func-def]>0 .Ed
+.	if \\n[js-type-def]>0 .El
+.	rr js-func-def
+.	rr js-func-rv
+.	rr js-type-def
+..
+.\" Document a function's return value
+.de RV
+.	Pp
+.	Sy Return value :
+.	ie \\w'\\$2'>0 \{\
+.		Sm off
+.		Vt \\$1 Ns Eo < Vt \\$2 Ec >
+.		Sm on
+.	\}
+.	el .Vt \\$1
+.	Bd -filled -offset 4n -compact
+.	nr js-func-rv 1
+..
+.\" Begin a function's parameters list
+.de PARAMETERS
+.	if \\n[js-func-rv]>0 \{\
+.		Ed
+.		rr js-func-rv
+.	\}
+.	Pp
+.	Sy Parameters :
+.	Bl -tag -width 4n -offset 4n -compact
+.	nr js-func-def 2
+..
+.\" Document a function parameter
+.de PARAM
+.	It Bro Vt \\$1 Brc Xo
+.	ie ''\\$3' .Fa \\$2
+.	el \{\
+.		ie '\&'\\$3' .Op Fa \\$2
+.		el           .Op Fa "\\$2 \\*= \\*(CB\\$3\fP"
+.	\}
+.	Xc
+.	ad l
+..
+.\" Document a custom type definition used by JSDoc
+.de TYPE
+.	if !\\n[js-type-def] \{\
+.		Bl -tag -width 6n
+.		nr js-type-def 1
+.	\}
+.	ds js-type-name \f(CB\\$1\fP
+.	shift
+.	Sm off
+.	It Vt \\$* No \~ Fa \f(CB\\*[js-type-name]\fP
+.	Sm on
+.	rm js-type-name
+..
+.\" Typeset the given arguments, double-quoting them for terminal display
+.de QQ
+.	ie t .Ql \\$*
+.	el   .Dq \\$*
+..
+.\" Emphasise the arguments without resorting to underlining
+.de EM
+.	ie t .Em \\$*
+.	el   *\\$**
+..
+.\" Document-specific macros:

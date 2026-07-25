@@ -44,7 +44,7 @@ if(process.argv[1] === path || globalThis.$0 === path){
  * Recursively list files in one or more directories.
  *
  * @example await findFiles("/path/to/search", {extensions: "htm,html,shtml"});
- * @param {String} paths - Directories to search
+ * @param {String|String[]} paths - Directories to search
  * @param {Object} [options={}] - Hash of search options
  * @param {FileExtensions} [options.extensions]
  *    Return only those results that match one of the specified file extensions.

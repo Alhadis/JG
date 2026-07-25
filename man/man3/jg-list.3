@@ -1,0 +1,287 @@
+.Dd July 25, 2026
+.Dt JG-LIST 3
+.Os
+.Sh NAME
+.Nm jg-list
+.Nd functions for recursively listing and filtering contents of directories
+.ft R
+.if \n(.f=0 .nr is-mandoc 1
+.
+.\"=============================================================================
+.Sh SYNOPSIS
+.Bd -literal
+.Ic import Bro
+.Bd -unfilled -offset 4n -compact
+.Sy findFiles ,
+.Sy buildExtensionPattern ,
+.Sy combinePatterns ,
+.Sy regexFromString ,
+.Sy resolvePaths ,
+.Ed
+.if !\n[is-mandoc]=1 .sp
+.Brc Ic from Qq Pa jg/bin/list.mjs ;
+.Ed
+.
+.\"=============================================================================
+.Sh DESCRIPTION
+.\" BEGIN: ./js-api.tmac {{{1
+.ds CR \fR
+.ds CB \fB
+.ds CI \fI
+.if !\n[is-mandoc]=1 \{\
+.	do if F CR .ds CR \f(CR
+.	do if F CB .ds CB \f(CB
+.	do if F CI .ds CI \f(CI
+.\}
+.ds =  \*(CR=\fP
+.ds {} \*(CB{}\fP
+.ds [] \*(CB[]\fP
+.ds .. ...
+.if '\*(.T'utf8' .ds .. \[u2026]
+.
+.\" Document a function
+.de FUNCTION
+.	END
+.	Pp
+.	nr js-func-def 1
+.	ds js-func-type function
+.	ie        '\\$1'-async*' .ds js-func-type async function*
+.	el \{ .ie '\\$1'-async'  .ds js-func-type async function
+.	el \{ .ie '\\$1'-*'      .ds js-func-type function*
+.	\}\}
+.	ie !'\\*[js-func-type]'function' \{\
+.		Tg \\$2
+.		Ft \\*[js-func-type]
+.		shift
+.	\}
+.	el \{\
+.		Tg \\$1
+.		Ft "function"
+.	\}
+.	rm js-func-type
+.	Fo \\$1
+.	shift
+.	Fa \\$@
+.	Fc
+.	Bd -filled -offset 6n -compact
+..
+.\" Manually end the current definition section
+.de END
+.	if \\n[js-func-rv]>0  .Ed
+.	if \\n[js-func-def]>1 .El
+.	if \\n[js-func-def]>0 .Ed
+.	if \\n[js-type-def]>0 .El
+.	rr js-func-def
+.	rr js-func-rv
+.	rr js-type-def
+..
+.\" Document a function's return value
+.de RV
+.	Pp
+.	Sy Return value :
+.	ie \\w'\\$2'>0 \{\
+.		Sm off
+.		Vt \\$1 Ns Eo < Vt \\$2 Ec >
+.		Sm on
+.	\}
+.	el .Vt \\$1
+.	Bd -filled -offset 4n -compact
+.	nr js-func-rv 1
+..
+.\" Begin a function's parameters list
+.de PARAMETERS
+.	if \\n[js-func-rv]>0 \{\
+.		Ed
+.		rr js-func-rv
+.	\}
+.	Pp
+.	Sy Parameters :
+.	Bl -tag -width 4n -offset 4n -compact
+.	nr js-func-def 2
+..
+.\" Document a function parameter
+.de PARAM
+.	It Bro Vt \\$1 Brc Xo
+.	ie ''\\$3' .Fa \\$2
+.	el \{\
+.		ie '\&'\\$3' .Op Fa \\$2
+.		el           .Op Fa "\\$2 \\*= \\*(CB\\$3\fP"
+.	\}
+.	Xc
+.	ad l
+..
+.\" Document a custom type definition used by JSDoc
+.de TYPE
+.	if !\\n[js-type-def] \{\
+.		Bl -tag -width 6n
+.		nr js-type-def 1
+.	\}
+.	ds js-type-name \f(CB\\$1\fP
+.	shift
+.	Sm off
+.	It Vt \\$* No \~ Fa \f(CB\\*[js-type-name]\fP
+.	Sm on
+.	rm js-type-name
+..
+.\" Typeset the given arguments, double-quoting them for terminal display
+.de QQ
+.	ie t .Ql \\$*
+.	el   .Dq \\$*
+..
+.\" Emphasise the arguments without resorting to underlining
+.de EM
+.	ie t .Em \\$*
+.	el   *\\$**
+..
+.\" Document-specific macros:
+.\" END: ./js-api.tmac }}}1
+.de (?flags)
+.	QQ (? Ns Ar \*(.. Ns \&) \\$1
+..
+.
+The following functions are exported by
+.Pa bin/list.mjs ,
+located in
+.Nm jg Ap s
+installation directory.
+.
+.FUNCTION -async findFiles paths "options \*= \*({}"
+Recursively list files in one or more directories.
+.RV Promise String[]
+.PARAMETERS
+.PARAM String|String[] paths
+One or more directories to search.
+.PARAM Object options \*({}
+Hash of options influencing search behaviour.
+.PARAM FileExtensions options.extensions \&
+Return only those results that match one of the specified file extensions.
+.PARAM FilenamePatterns options.ignore \&
+Exclude files whose path matches the given pattern.
+Defaults to
+.Ql /(?:^|[\e/])(?:\e.git|node_modules)$/i .
+.
+.FUNCTION buildExtensionPattern exts
+Construct a RegExp to match one or more file extensions.
+.RV ?RegExp
+A regular expression,
+or
+.Dv null
+if called with empty input.
+.PARAMETERS
+.PARAM FileExtensions exts
+List of extensions to match case-insensitively.
+.
+.FUNCTION combinePatterns input "matchAll \*= \f(CBfalse\fP"
+Combine multiple path-matching pattern(s) into a single expression or callback.
+.RV ?RegExp|Function
+If multiple regular expressions were produced,
+the return value is a predicate function that \
+returns true if one of the patterns match;
+otherwise,
+a single regular expression is returned if input wasn't empty,
+and
+.Dv null
+if it was.
+.PARAMETERS
+.PARAM FilenamePatterns input
+A list of patterns to combine.
+.PARAM Boolean matchAll false
+If true,
+then multiple regular expressions produce a predicate that only \
+returns true if
+.Em every
+expression matches the input.
+Normally,
+predicates only require at least one expression to match.
+.
+.FUNCTION regexFromString input
+Construct a regular expression from a string representation.
+.RV ?RegExp
+A regular expression,
+or
+.Dv null
+if input was a falsey value.
+.PARAMETERS
+.PARAM String input
+Body of the the RegExp object to construct.
+Modifiers,
+if any,
+must be expressed as a prefix of the form
+.(?flags) ,
+which is stripped from the RegExp's source before instantiation.
+As of this writing
+.Pq July 2026 ,
+ECMAScript regular expressions lack support for scoped modifier syntax,
+a feature well-supported by more mature regex engines
+.Pq e.g., Perl/PCRE or Oniguruma .
+.
+.FUNCTION resolvePaths paths
+Resolve a list of directory paths to be searched.
+.RV String[]
+.PARAMETERS
+.PARAM String|String[] paths
+One or more filesystem paths to search,
+which may be relative or absolute,
+but must reference existing directory objects.
+Non-absolute paths are resolved relative to the current directory using the
+.Fn resolve
+function from Node.js's built-in
+.Lb path
+module.
+Paths that reference non-directories will produce a diagnostic message on
+.Dv STDERR
+and set an error code of 2.
+.Pp
+If
+.Fa paths
+is empty,
+the function returns a single-element array \
+containing the current working directory
+.Po obtained by Node.js's
+.Fn process.cwd
+function
+.Pc .
+.
+.END
+.\"=============================================================================
+.Sh Type definitions
+.TYPE FileExtensions String | String[]
+List of file extensions,
+specified with or without leading dots.
+.Pp
+If passed as a string,
+the value is split by consecutive runs of dots,
+commas,
+and whitespace.
+Otherwise,
+when passed as an array,
+each entry of the list is converted to a string and trimmed of leading dots.
+.
+.TYPE FilenamePatterns RegExp | String | RegExp[] | String[]
+One or more patterns designed to match part of a file path.
+.Pp
+String values are converted to regular expressions,
+with modifiers specified in a leading
+.(?flags)
+group that's stripped from the value that forms the body of the RegExp.
+.Pp
+Multiple regular expressions produce a predicate function that returns true \
+if one of the expressions matches the callback's argument.
+This is used for the
+.Fa filter
+option of the
+.Fn ls
+function.
+.
+.END
+.\"=============================================================================
+.Sh SEE ALSO
+.Xr jg-list 1
+.
+.\"=============================================================================
+.Sh AUTHORS
+.An -nosplit
+Copyright \(co 2019\(en2026
+.An John Gardner Aq Mt gardnerjohng@gmail.com .
+Freely released under the
+.Lk http://opensource.org/licenses/ISC "ISC license" .
