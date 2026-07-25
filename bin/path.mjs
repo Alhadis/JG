@@ -45,10 +45,10 @@ export default function getPath(filename){
 		return resolve(join(ROOT_DIR, "eslint", file));
 	}
 	
-	// Shorthand: TSLint
+	// Shorthand: TSLint (now ESLint with TypeScript-specific config)
 	match = filename.match(/^\.?tslint(?:rc|[-/]?config)?(?:\.json)?$/i);
 	if(null !== match)
-		return resolve(join(ROOT_DIR, "etc", "tslint.json"));
+		return resolve(join(ROOT_DIR, "eslint", "typescript.full.json"));
 
 	// Shorthand: CoffeeLint
 	match = filename.match(/^\.?coffeelint(?:rc|[-/]?config)?(?:\.json)?$/i);
