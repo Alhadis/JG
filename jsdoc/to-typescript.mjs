@@ -17,7 +17,7 @@ export async function extractTypes(inputFile){
 	 * @property {String} type
 	 * @property {Object} doclet
 	 */
-	const {doclets} = await loadFile(inputFile);
+	const {doclets} = await loadFile(inputFile, true);
 	const types = [];
 	for(const doc of doclets){
 		if(doc.isEnum && (doc.properties || []).length)
@@ -80,11 +80,14 @@ export async function extractTypes(inputFile){
  *
  * @param {String} path
  * @param {Boolean} [ignoreErrors=false]
+ * @param {Boolean} [trace=false] - Trace external command invocations on stderr
  * @return {{doclets: Object[], source: String}}
  */
-export async function loadFile(path, ignoreErrors = false){
+export async function loadFile(path, ignoreErrors = false, trace = false){
 	const dir = dirname(fileURLToPath(import.meta.url));
-	const result = await exec("jsdoc", ["-c", join(dir, "config.json"), "-X", path]);
+	const execArgs = ["jsdoc", ["-c", join(dir, "config.json"), "-X", path]];
+	process.stderr.write("\x1B[2;32mλ\x1B[22m " + [execArgs[0], ...execArgs[1]].join(" ") + "\x1B[39m\n");
+	const result = await exec(...execArgs);
 	
 	// Complain loudly if JSDoc reported an error
 	if(!ignoreErrors){
