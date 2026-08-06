@@ -1,0 +1,114 @@
+.Dd July 25, 2026
+.Dt JG-PATH 1
+.Os
+.Sh NAME
+.Nm jg-path
+.Nd print the location of a file in JG's installation path
+.
+.\"=============================================================================
+.Sh SYNOPSIS
+.Nm jg
+.Cm path
+.Op Ar files
+.
+.\"=============================================================================
+.Sh DESCRIPTION
+.Nm
+prints the resolved,
+absolute paths of
+.Ar files
+named on the command-line that reference a file located in
+.Nm jg Ap s
+installation path.
+Files may be named partially
+.Pq Ql Nm jg Cm path Pa eslintrc.json
+or in full
+.Pq Ql Nm jg Cm path Pa eslint/.eslintrc.json .
+Certain directory names,
+unless qualified with a
+.Ql ./
+prefix,
+map to a more relevant file,
+enabling concise specification of frequently-used files.
+For example,
+the command
+.Ql Nm jg Cm path Pa eslint
+resolves to the absolute path of the
+.Pa eslint/.eslintrc.json
+file,
+instead of the subdirectory of that name.
+.Pp
+If no
+.Ar paths
+are given on the command-line,
+the installation directory of
+.Xr jg 1
+is printed instead.
+.Pp
+A terser alias of this command is provided by the
+.Nm jg
+wrapper itself,
+via its
+.Fl p
+switch.
+See the respective entry under
+.Sx OPTIONS
+in
+.Xr jg 1 .
+.
+.\"=============================================================================
+.Sh EXIT STATUS
+.Bl -tag -width 4n -compact
+.It 0
+Successful execution.
+.It 1
+One or more of the requested files could not be found.
+.El
+.
+.\"=============================================================================
+.Sh EXAMPLES
+Print the full path of
+.Nm Ap s
+base ESLint configuration
+.Pq which will be something to the effect of \
+ Pa /usr/local/lib/node_modules/jg/eslint/.eslintrc.json :
+.Bd -literal -offset indent
+.Nm jg Cm path Pa eslint
+.Nm jg Cm path Pa eslintrc
+.Nm jg Cm path Pa eslint/.eslintrc.json
+.Ed
+.
+.Pp
+Print the full path of a subcommand file:
+.Bd -literal -offset indent
+.Nm jg Cm path Pa bin/lint.mjs
+.Nm jg Cm path Pa lint
+.Nm jg Fl p Pa bin/lint
+.Nm jg Fl p Pa lint
+.Ed
+.
+.\"=============================================================================
+.Sh SEE ALSO
+.Xr jg 1 ,
+.Xr jg-where 1 ,
+.Xr realpath 1 ,
+.Xr jg-path 3
+.
+.\"=============================================================================
+.Sh HISTORY
+A
+.Cm path
+command
+.Pq and Nm jg Ap s No corresponding shortcut option, Fl p
+was added on December 29, 2018,
+originally in support of
+.Xr jg-lint 1
+to simplify lookups of linter configs.
+.
+.\"=============================================================================
+.Sh AUTHORS
+.An -nosplit
+Copyright \(co 2017\(en2026
+.An John Gardner Aq Mt gardnerjohng@gmail.com .
+Freely released under the
+.Lk http://opensource.org/licenses/ISC "ISC license" .
