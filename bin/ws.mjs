@@ -1115,14 +1115,14 @@ export function unpackValue(input){
  * @return {void}
  */
 export function useGracefulQuit(fn = null){
+	process.on("SIGTTIN", () => {});
+	process.on("SIGTTOU", () => {});
 	if(!process.stdin.isTTY) return;
 	const halt = () => {
 		if("function" === typeof fn) fn();
 		process.stdin.setRawMode(false);
 		process.exit(0);
 	};
-	process.on("SIGTTIN", () => {});
-	process.on("SIGTTOU", () => {});
 	try{ process.stdin.setRawMode(true); }
 	catch(e){ return; }
 	process.stdin.on("data", data => {
