@@ -85,6 +85,11 @@ export default function getPath(filename){
 	if(null !== match)
 		return resolve(join(ROOT_DIR, "etc", "profiles", "firefox-headless.js"));
 	
+	// Commitlint
+	match = filename.match(/^\.?commit[_-]?(?:lint)?(?:rc|\.?config)?\.?(?:[cm]?[jt]s|json|ya?ml)?$/i);
+	if(null !== match)
+		return resolve(join(ROOT_DIR, "etc", ".commitlintrc.mjs"));
+	
 	// Wrapper/front-end
 	match = filename.match(/^\.?index\.?(?:[cmt]?js)?$|^(?:entry|main|self)$/);
 	if(null !== match)
