@@ -74,7 +74,15 @@
 ..
 .\" Document a function parameter
 .de PARAM
-.	It Bro Vt \\$1 Brc Xo
+.	ds js-param-types \&
+.	while '|'\\$2' \{\
+.		as js-param-types \\$1 | \"
+.		shift 2
+.	\}
+.	as js-param-types \\$1
+.	Sm off
+.	It Bro Vt \\*[js-param-types] Brc Xo
+.	Sm on
 .	ie ''\\$3' .Fa \\$2
 .	el \{\
 .		ie '\&'\\$3' .Op Fa \\$2
@@ -95,6 +103,11 @@
 .	It Vt \\$* No \~ Fa \f(CB\\*[js-type-name]\fP
 .	Sm on
 .	rm js-type-name
+..
+.\" Wrapper around mdoc(7)'s subsection macro that closes an open display
+.de SS
+.	END
+.	Ss \\$@
 ..
 .\" Typeset the given arguments, double-quoting them for terminal display
 .de QQ

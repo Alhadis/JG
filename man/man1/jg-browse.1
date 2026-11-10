@@ -1,0 +1,239 @@
+.Dd August 12, 2026
+.Dt JG-BROWSE 1
+.Os
+.Sh NAME
+.Nm jg-browse
+.Nd open a webpage in a browser
+.
+.\"=============================================================================
+.Sh SYNOPSIS
+.Nm
+.Op Fl acefios
+.Op Fl U
+.Op Fl w | v
+.Op Ar url
+.
+.\"=============================================================================
+.Sh DESCRIPTION
+.Nm
+opens a URL in a web browser,
+headlessly if possible.
+The subcommand complements
+.Xr jg-serve 1
+and is designed to be further controlled using
+.Xr jg-ws 1 ,
+although this aspect is a work-in-progress and should be considered unstable.
+.Pp
+If no
+.Ar url
+is specified on the command-line,
+.Nm
+defaults to the URL
+.Dq Em http://localhost:1337/
+for consistency with the
+.Xr jg-serve 1
+command.
+.
+.\"=============================================================================
+.Sh OPTIONS
+.\" Defines a string named $1 containing the English name of a numeral (0-10)
+.de EngNum
+.	ie        \\$2=0  .ds \\$1 zero
+.	el \{ .ie \\$2=1  .ds \\$1 one
+.	el \{ .ie \\$2=2  .ds \\$1 two
+.	el \{ .ie \\$2=3  .ds \\$1 three
+.	el \{ .ie \\$2=4  .ds \\$1 four
+.	el \{ .ie \\$2=5  .ds \\$1 five
+.	el \{ .ie \\$2=6  .ds \\$1 six
+.	el \{ .ie \\$2=7  .ds \\$1 seven
+.	el \{ .ie \\$2=8  .ds \\$1 eight
+.	el \{ .ie \\$2=9  .ds \\$1 nine
+.	el \{ .ie \\$2=10 .ds \\$1 ten
+.	el \{             .ds \\$1 \\$2
+.	\}\}\}\}\}\}\}\}\}\}\}
+..
+.
+.\" Outputs a list of environment variables used to locate a browser
+.de EnvList
+.	if \\n(.$<1 .return
+.	ie \\n(.$=1 \{\
+If the
+.Ev \\$1
+environment variable is set and points to an existing file,
+its value is used as the browser's location,
+and no system directories will be searched.
+.	\}
+.	el \{\
+.		EngNum EnvCount \\n(.$
+.		ie \\n(.$=2 \
+.			No If either of the Ev \\$1 No or Ev \\$2
+.		el \{\
+.			No If any of the
+.			while (\\n(.$>1) \{\
+.				Ev \\$1 ,
+.				shift
+.			\}
+.			No or Ev \\$1
+.		\}
+environment variables are set,
+the first of the \\*[EnvCount] which references an existing file \
+is used instead of searching system application directories.
+.	\}
+..
+.Ss Browser selection
+.Bl -tag -width 6n
+.It Fl a , -auto
+Use whichever browser is available:
+Chrome,
+Firefox,
+Safari,
+Edge,
+Opera,
+or Internet Explorer
+.Pq in that order .
+This is the default behaviour.
+.
+.It Fl c , -chrome
+Use Google Chrome or Chromium.
+.EnvList CHROME_CANARY_BIN CHROME_BIN CHROMIUM_BIN
+.
+.It Fl e , -edge
+Use Microsoft Edge.
+No distinction is made between the current Chromium-based version \
+and the one retroactively branded by Microsoft as
+.Dq Edge\~Legacy
+.Pq 2015\(en2020 .
+.
+.It Fl f , -firefox
+Use Mozilla Firefox.
+.EnvList FIREFOX_NIGHTLY_BIN FIREFOX_BIN FIREFOX_DEVELOPER_BIN FIREFOX_AURORA_BIN
+.
+.It Fl i , -ie
+Use Internet Explorer
+.Pq Windows only .
+.
+.It Fl o , -opera
+Use Opera.
+.EnvList OPERA_BIN
+Like Edge,
+no distinction is made between the older Presto-based version of Opera \
+and the current version based on Chromium.
+.
+.It Fl s , -safari
+Use Safari.
+.EnvList SAFARI_BIN
+.El
+.
+.Ss General options
+.Bl -tag -width 6n
+.It Fl U , -unstable
+Include experimental or beta versions of browsers when searching.
+These have higher precedence in the search than stable versions.
+.
+.It Fl v , -version
+Print the version string of the located browser.
+The combination of this flag and
+.Fl -auto ,
+while legal,
+emits the version string without identifying the browser in question.
+.
+.It Fl w , -where
+Print the location of the browser instead of launching it.
+This option is mutally exclusive with
+.Fl v .
+.El
+.
+.\"=============================================================================
+.Sh ENVIRONMENT
+.Bl -tag -width FIREFOX_DEVELOPER_BIN
+.It Ev DEBUG
+If non-empty,
+enables the display of non-essential feedback about the command's current state.
+.
+.It Ev CHROME_BIN
+Location of Google Chrome.
+.
+.It Ev CHROME_CANARY_BIN
+Location of Google Chrome Canary,
+the nightly build of the browser geared towards developers.
+Only used when the
+.Fl -unstable
+flag is set.
+.
+.It Ev CHROMIUM_BIN
+Location of Chromium.
+This is distinct from Google Chrome in that it lacks the closed-source,
+proprietary components included with the latter.
+.
+.It Ev FIREFOX_BIN
+Location of Mozilla Firefox.
+.
+.It Ev FIREFOX_AURORA_BIN
+Location of Firefox Aurora,
+a now-discontinued build channel that was a
+.Dq halfway point
+between nightly builds and Firefox\~Beta.
+Support for Aurora releases ended in April 2017.
+.
+.It Ev FIREFOX_DEVELOPER_BIN
+Location of Firefox Developer Edition, a
+.Dq specially-themed
+version of Firefox\~Beta with different branding and build flags.
+.
+.It Ev FIREFOX_NIGHTLY_BIN
+Location of Firefox Nightly,
+a nightly build of the browser intended for early testing and bug-reporting.
+Only used when the
+.Fl -unstable
+flag is set.
+.
+.It Ev OPERA_BIN
+Location of Opera.
+.
+.It Ev SAFARI_BIN
+Location of Safari.
+.
+.El
+.
+.\"=============================================================================
+.Sh SEE ALSO
+.Xr jg 1 ,
+.Xr jg-serve 1 ,
+.Xr jg-ws 1 ,
+.Xr jg-browse 3
+.
+.\"=============================================================================
+.Sh AUTHORS
+.An -nosplit
+Copyright \(co 2020\(en2026
+.An John Gardner Aq Mt gardnerjohng@gmail.com .
+Freely released under the
+.Lk http://opensource.org/licenses/ISC "ISC license" .
+.
+.\"=============================================================================
+.Sh BUGS
+Add support for
+.Nm geckodriver ,
+.Nm puppeteer ,
+and other WebDriver/Selenium-based methods of browser automation.
+.
+.Pp
+Firefox\ Beta releases are not supported,
+and Developer Edition is erroneously included in searches when the
+.Fl -unstable
+flag hasn't been set.
+Moreover,
+as there are
+.Dq several
+unstable release channels of Firefox,
+an option or environment variable should be added \
+to select a release channel by name.
+.
+.Pp
+Support for branded alternatives to Firefox
+.Pq LibreWolf , Floorp , Tor ,
+Google\ Chrome
+.Pq Brave\ Browser ,
+Opera
+.Pq Opera\ Air, Opera\ GX, Opera\ Neon ,
+and LadyBird once it's stable.

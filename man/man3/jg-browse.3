@@ -1,0 +1,310 @@
+.Dd November 11, 2026
+.Dt JG-BROWSE 3
+.Os
+.Sh NAME
+.Nm jg-browse
+.Nd functions for locating and launching a system's web browsers
+.ft R
+.if \n(.f=0 .nr is-mandoc 1
+.
+.\"=============================================================================
+.Sh SYNOPSIS
+.Bd -literal
+.Ic import Bro
+.Bd -unfilled -offset 4n -compact
+.Sy find ,
+.Sy findChrome ,
+.Sy findEdge ,
+.Sy findFirefox ,
+.Sy findIE ,
+.Sy findOpera ,
+.Sy findSafari ,
+.Sy open ,
+.Sy openChrome ,
+.Sy openEdge ,
+.Sy openFirefox ,
+.Sy openIE ,
+.Sy openOpera ,
+.Sy openSafari ,
+.Sy getVersion ,
+.Sy getWin32ProgramPaths ,
+.Ed
+.if !\n[is-mandoc]=1 .sp
+.Brc Ic from Qq Pa jg/bin/lint.mjs ;
+.Ed
+.
+.\"=============================================================================
+.Sh DESCRIPTION
+.\" BEGIN: ./js-api.tmac {{{1
+.ds CR \fR
+.ds CB \fB
+.ds CI \fI
+.if !\n[is-mandoc]=1 \{\
+.	do if F CR .ds CR \f(CR
+.	do if F CB .ds CB \f(CB
+.	do if F CI .ds CI \f(CI
+.\}
+.ds =  \*(CR=\fP
+.ds {} \*(CB{}\fP
+.ds [] \*(CB[]\fP
+.ds .. ...
+.if '\*(.T'utf8' .ds .. \[u2026]
+.
+.\" Document a function
+.de FUNCTION
+.	END
+.	Pp
+.	nr js-func-def 1
+.	ds js-func-type function
+.	ie        '\\$1'-async*' .ds js-func-type async function*
+.	el \{ .ie '\\$1'-async'  .ds js-func-type async function
+.	el \{ .ie '\\$1'-*'      .ds js-func-type function*
+.	\}\}
+.	ie !'\\*[js-func-type]'function' \{\
+.		Tg \\$2
+.		Ft \\*[js-func-type]
+.		shift
+.	\}
+.	el \{\
+.		Tg \\$1
+.		Ft "function"
+.	\}
+.	rm js-func-type
+.	Fo \\$1
+.	shift
+.	Fa \\$@
+.	Fc
+.	Bd -filled -offset 6n -compact
+..
+.\" Manually end the current definition section
+.de END
+.	if \\n[js-func-rv]>0  .Ed
+.	if \\n[js-func-def]>1 .El
+.	if \\n[js-func-def]>0 .Ed
+.	if \\n[js-type-def]>0 .El
+.	rr js-func-def
+.	rr js-func-rv
+.	rr js-type-def
+..
+.\" Document a function's return value
+.de RV
+.	Pp
+.	Sy Return value :
+.	ie \\w'\\$2'>0 \{\
+.		Sm off
+.		Vt \\$1 Ns Eo < Vt \\$2 Ec >
+.		Sm on
+.	\}
+.	el .Vt \\$1
+.	Bd -filled -offset 4n -compact
+.	nr js-func-rv 1
+..
+.\" Begin a function's parameters list
+.de PARAMETERS
+.	if \\n[js-func-rv]>0 \{\
+.		Ed
+.		rr js-func-rv
+.	\}
+.	Pp
+.	Sy Parameters :
+.	Bl -tag -width 4n -offset 4n -compact
+.	nr js-func-def 2
+..
+.\" Document a function parameter
+.de PARAM
+.	ds js-param-types \&
+.	while '|'\\$2' \{\
+.		as js-param-types \\$1 | \"
+.		shift 2
+.	\}
+.	as js-param-types \\$1
+.	Sm off
+.	It Bro Vt \\*[js-param-types] Brc Xo
+.	Sm on
+.	ie ''\\$3' .Fa \\$2
+.	el \{\
+.		ie '\&'\\$3' .Op Fa \\$2
+.		el           .Op Fa "\\$2 \\*= \\*(CB\\$3\fP"
+.	\}
+.	Xc
+.	ad l
+..
+.\" Document a custom type definition used by JSDoc
+.de TYPE
+.	if !\\n[js-type-def] \{\
+.		Bl -tag -width 6n
+.		nr js-type-def 1
+.	\}
+.	ds js-type-name \f(CB\\$1\fP
+.	shift
+.	Sm off
+.	It Vt \\$* No \~ Fa \f(CB\\*[js-type-name]\fP
+.	Sm on
+.	rm js-type-name
+..
+.\" Wrapper around mdoc(7)'s subsection macro that closes an open display
+.de SS
+.	END
+.	Ss \\$@
+..
+.\" Typeset the given arguments, double-quoting them for terminal display
+.de QQ
+.	ie t .Ql \\$*
+.	el   .Dq \\$*
+..
+.\" Emphasise the arguments without resorting to underlining
+.de EM
+.	ie t .Em \\$*
+.	el   *\\$**
+..
+.\" Document-specific macros:
+.\" END: ./js-api.tmac }}}1
+.ds true  \f(CBtrue\fP
+.ds false \f(CBfalse\fP
+.ds null  \f(CBnull\fP
+.
+The following functions are exported by
+.Pa bin/browse.mjs ,
+located in
+.Nm jg Ap s
+installation directory.
+.
+.SS Locating browsers
+.FUNCTION -async find "browser \*= \(dqauto\(dq" "unstable \*= \*[false]"
+Locate the specified browser on the host system.
+.RV Promise ?String
+.PARAMETERS
+.PARAM String browser \(dqauto\(dq
+Name of the desired browser;
+.Sy auto
+will locate whatever's available.
+.PARAM Boolean unstable \*[false]
+Check for unstable versions first.
+.
+.FUNCTION -async findChrome "unstable \*= \*[false]"
+Locate Google Chrome on the host system.
+.RV Promise ?String
+.PARAMETERS
+.PARAM Boolean unstable \*[false]
+Check for unstable Chrome versions first.
+.
+.FUNCTION -async findEdge
+Locate Microsoft Edge on the host system.
+.RV Promise ?String
+.
+.FUNCTION -async findFirefox "unstable \*= \*[false]"
+Locate Firefox on the host system.
+Influenced by the
+.Ev FIREFOX_NIGHTLY_BIN ,
+.Ev FIREFOX_BIN ,
+.Ev FIREFOX_DEVELOPER_BIN ,
+and
+.Ev FIREFOX_AURORA_BIN
+environment variables.
+.RV Promise ?String
+.PARAMETERS
+.PARAM Boolean unstable \*[false]
+Check for unstable Firefox versions first.
+.
+.FUNCTION -async findIE
+Locate Internet Explorer on the host system.
+.Pq Bless your heart if you find yourself needing this function .
+.RV Promise ?String
+.
+.FUNCTION -async findOpera
+Locate Opera on the host system.
+Influenced by the
+.Ev OPERA_BIN
+environment variable,
+if set.
+.RV Promise ?String
+.
+.FUNCTION -async findSafari
+Locate Safari on the host system.
+Influenced by the
+.Ev SAFARI_BIN
+environment variable,
+if set.
+.RV Promise ?String
+.
+.SS Opening browsers
+.FUNCTION -async open "url" "browser \*= \(dqauto\(dq"
+Open a page in the specified browser.
+.Pp
+If the second parameter is
+.Qq Li auto ,
+the first available browser is used.
+.RV Promise ChildProcess
+.PARAMETERS
+.PARAM String | URL url
+.PARAM String browser "\(dqauto\(dq"
+.
+.FUNCTION -async openChrome "url"
+Open a page in Google Chrome.
+.RV Promise ChildProcess
+.PARAMETERS
+.PARAM String | URL url
+.
+.FUNCTION -async openEdge "url"
+Open a page in Microsoft Edge.
+.RV Promise ChildProcess
+.PARAMETERS
+.PARAM String | URL url
+.
+.FUNCTION -async openFirefox "url"
+Open a page in Firefox.
+Uses the
+.Pa etc/profiles/firefox-headless.js
+profile to configure the process.
+.RV Promise ChildProcess
+.PARAMETERS
+.PARAM String | URL url
+.
+.FUNCTION -async openIE "url"
+Open a page in Internet Explorer.
+.RV Promise ChildProcess
+.PARAMETERS
+.PARAM String | URL url
+.
+.FUNCTION -async openOpera "url"
+Open a page in Opera.
+.RV Promise ChildProcess
+.PARAMETERS
+.PARAM String | URL url
+.
+.FUNCTION -async openSafari "url"
+Open a page in Safari.
+.RV Promise ChildProcess
+.PARAMETERS
+.PARAM String | URL url
+.
+.SS Other functions
+.FUNCTION getWin32ProgramPaths
+Resolve a list of program directories for each drive in the user's
+.Ev $Path
+.Aq Lk \fIhttps://ss64.com/nt/syntax-variables.html\fP .
+Only relevant on Windows.
+.RV Array String
+.
+.FUNCTION -async getVersion "path"
+Retrieve a program's version string.
+.RV Promise ?String
+.PARAMETERS
+.PARAM String path
+.
+.
+.END
+.\"=============================================================================
+.Sh SEE ALSO
+.Xr jg-browse 1
+.Pp
+Unofficial Chromium command-line reference:
+.Lk \fIhttps://peter.sh/experiments/chromium-command-line-switches/\fP
+.
+.\"=============================================================================
+.Sh AUTHORS
+.An -nosplit
+Copyright \(co 2020\(en2026
+.An John Gardner Aq Mt gardnerjohng@gmail.com .
+Freely released under the
+.Lk http://opensource.org/licenses/ISC "ISC license" .
