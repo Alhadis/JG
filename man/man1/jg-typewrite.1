@@ -1,0 +1,251 @@
+.Dd November 11, 2026
+.Dt JG-TYPEWRITE 1
+.Os
+.Sh NAME
+.Nm jg-typewrite
+.Nd generate TypeScript declaration files from JSDoc annotations
+.
+.\"=============================================================================
+.Sh SYNOPSIS
+.Nm
+.Op Fl s
+.Op Fl d Ar type name body
+.Op Fl e Ar exclude
+.Op Fl h Ar header
+.Op Fl f Ar footer
+.Ar \.\.\.files
+.
+.Nm
+.Fl h | -help
+.
+.\"=============================================================================
+.Sh DESCRIPTION
+.ad l
+.Nm
+extracts type annotations from JSDoc blocks in a list of source
+.Ar files ,
+generating a
+.Dq Ar filename Ns Sy \.d.ts
+file for each one.
+Each type declaration is written on a single line,
+making the files amenable to tooling like
+.Xr cat 1
+and
+.Xr sort 1 .
+.
+.Pp
+.\" Replace an aliased version of a JSDoc tag (\$1) with
+.\" its "canonical" form stored in string named \$2.
+.de jsdoc-dealias
+.	ds \\$2 \&
+.	if '\\$1'virtual'      .ds \\$2 abstract
+.	if '\\$1'extends'      .ds \\$2 augments
+.	if '\\$1'constructor'  .ds \\$2 class
+.	if '\\$1'const'        .ds \\$2 constant
+.	if '\\$1'defaultvalue' .ds \\$2 default
+.	if '\\$1'desc'         .ds \\$2 description
+.	if '\\$1'host'         .ds \\$2 external
+.	if '\\$1'fileoverview' .ds \\$2 file
+.	if '\\$1'overview'     .ds \\$2 file
+.	if '\\$1'emits'        .ds \\$2 fires
+.	if '\\$1'func'         .ds \\$2 function        
+.	if '\\$1'method'       .ds \\$2 function
+.	if '\\$1'var'          .ds \\$2 member
+.	if '\\$1'arg'          .ds \\$2 param
+.	if '\\$1'argument'     .ds \\$2 param
+.	if '\\$1'prop'         .ds \\$2 property
+.	if '\\$1'return'       .ds \\$2 returns
+.	if '\\$1'exception'    .ds \\$2 throws
+.	if '\\$1'yield'        .ds \\$2 yields
+.	if '\\$1'linkcode'     .ds \\$2 link
+.	if '\\$1'linkplain'    .ds \\$2 link
+..
+.de @
+.	jsdoc-dealias \\$1 jsdoc-tag
+.	ie t .Lk "https://jsdoc.app/tags-\\*[jsdoc-tag]" \f(CR@\\*[jsdoc-tag]\fP \&\\$2
+.	el   .Sy @\\$1 \&\\$2
+.	rm jsdoc-tag
+..
+The JSDoc markup parsed when called via
+.Nm
+is syntactically differently than normal JSDoc blocks.
+These differences in syntax are to accommodate misuse of
+.@ var
+and
+.@ property ,
+sometimes used in lieu of
+.@ enum
+when synthesising enumerated types without a corresponding JavaScript member.
+.
+.\"=============================================================================
+.Sh OPTIONS
+.Bl -tag -width 6n
+.It Fl d , Fl -declare Ar type name body
+Add an additional type declaration to the file.
+.Ar type
+may be any exportable binding name
+.Pq Sy const , let , type , interface , var No or Sy function ,
+.Ar name
+is the name of the declaration's subject,
+and
+.Ar body
+is its definition,
+possibly requiring quotes.
+This option may be specified multiple times,
+once per declaration.
+.Pp
+Combining this option with
+.Fl -exclude
+redefines a type declaration;
+exclusion patterns don't extend to declarations specified via command-line.
+.
+.It Fl e , Fl -exclude Ar pattern
+Regular expression matching the names of types to exclude from generated files.
+.Pp
+This option may be specified multiple times
+to provide additional exclusion patterns,
+only one of which need match a type's name for it to be filtered out.
+.
+.It Fl h , Fl -header Ar text
+Prologue to prepend to each generated type declaration file.
+.
+.It Fl f , Fl -footer Ar text
+Epilogue to append to each generated type declaration file.
+.
+.It Fl s , Fl -sort
+Sort generated typings alphabetically.
+.
+.It Fl h , Fl -help
+Print a terse usage summary, then terminate.
+.El
+.
+.\"=============================================================================
+.Sh FILES
+The following file paths are relative to
+.Nm jg Ap s
+installation directory.
+.
+.ds to-ts jsdoc/to-typescript.mjs
+.Bl -tag -width 4n
+.It Pa jsdoc/config.json
+JSDoc configuration file that initialises the plugins that do the heavy lifting.
+Referenced automatically by the call to
+.Ql jsdoc
+made by
+.Pa \*[to-ts] ,
+which see.
+.
+.It Pa jsdoc/fix-props.cjs
+JSDoc plugin to replace aberrant
+.@ property
+usage in incompatible contexts.
+.
+.It Pa jsdoc/fix-typedefs.cjs
+JSDoc plugin to replace
+.@ enum
+tags with TypeScript unions,
+among other tweaks related to
+.@ typedef
+tags.
+.
+.It Pa \*[to-ts]
+Module that exports functions to perform the chaotic wrangling of JSDoc markup,
+called directly from
+.Nm .
+.
+.It Pa jsdoc/utils.cjs
+Module that exports ancillary helper functions shared by
+.Pa \*[to-ts]
+and the aforementioned plugins.
+.Pp
+Most of these helper functions are specific to
+.Nm Ap s
+usage,
+and are of little use elsewhere.
+.El
+.
+.\"=============================================================================
+.Sh EXIT STATUS
+.Bl -tag -width Ds -compact
+.It 0
+.Nm
+generated each TypeScript declaration file without an error.
+.It 1
+No arguments were passed to
+.Nm ,
+or one of them references a non-regular file
+.Pq directory, socket, FIFO, character device, etc .
+.It 2
+Required program
+.Ql jsdoc
+not found in
+.Ev PATH .
+.El
+.
+.\"=============================================================================
+.Sh EXAMPLES
+Consider the following file that exports mathematical functions,
+where the parameters of
+.Fn angleTo
+reference a JSDoc type defined solely via
+.@ typedef :
+.Bd -literal -offset 4n
+/**
+ * Measure the arctangent between two points.
+ * @param {Point} a
+ * @param {Point} b
+ * @return {Number}
+ */
+export function angleTo(a, b){
+	return radToDeg(Math.atan2(b[1] - a[1], a[0] - b[0]));
+}
+/**
+ * Convert radians to degrees.
+ * @param {Radians} value
+ * @return {Degrees}
+ */
+export function radToDeg(value){
+	return value * 180 / Math.PI;
+}
+/**
+ * Pair of floats representing Cartesian coordinates.
+ * @typedef  {Number[]} Point
+ * @property {Number} x
+ * @property {Number} y
+ */
+.Ed
+.Pp
+Running
+.Bd -literal -compact -offset 4n
+.Nm jg Cm typewrite \e
+.Bd -unfilled -compact -offset 6n
+.	Fl -header No \(dq// Generated file\(dq \e
+.	Fl -declare Ar type Vt Radians number No \e
+.	Fl -declare Ar type Vt Degrees number No \e
+.	Ar angle-to.mjs
+.Ed
+.Ed
+.Pp
+will generate
+.Pa angle-to.d.ts
+with the following contents:
+.Bd -literal -offset 4n
+// Generated file
+declare interface Point extends Array<number> {x: number; y: number}
+export declare function angleTo(a: Point, b: Point): number;
+export declare function radToDeg(value: Radians): Degrees;
+export declare type Radians = number;
+export declare type Degrees = number;
+.Ed
+.Pp
+Check that generated declaration files are valid TypeScript syntax:
+.Dl Cm tsc Fl -noEmit Ar angle-to.d.ts
+.
+.\"=============================================================================
+.Sh SEE ALSO
+.Xr jsdoc 1 ,
+.Xr jsdoctypeparser 1 ,
+.Xr tsc 1 .
+.Pp
+TypeScript declaration file reference:
+.Lk \fIhttps://www.typescriptlang.org/docs/handbook/2/type-declarations.html\fP
