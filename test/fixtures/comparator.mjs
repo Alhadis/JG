@@ -11,6 +11,21 @@ export function comparator(a, b){
 }
 
 /**
+ * Non-sequitur mixed-type type definition.
+ * @typedef {String|Number|Boolean} Garbage
+ * @var {String} [BBCodeDelims   = "[[,]]"] - Pairs of balanced square brackets
+ * @var {String} [PSDictDelims   = "<<,>>"] - Pairs of balanced angle brackets
+ * @var {String} [WikiTextDelims = "{{,}}"] - Pairs of balanced curly brackets
+ */
+
+/**
+ * Pair of floats representing Cartesian coordinates.
+ * @typedef  {Float64Array} Point
+ * @property {Number} x
+ * @property {Number} y
+ */
+
+/**
  * Value returned from a sorting comparator.
  * @typedef {Number} SortResult
  * @var {Number} [EQUAL_TO     =  0] Both arguments are equal.

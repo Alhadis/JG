@@ -193,10 +193,12 @@ export function parseTypedef(obj, decl = true){
 		if(isTuple(obj))
 			return parseTuple(obj, decl);
 		
-		// This shouldn't happen
+		// This shouldn't happen (e.g., “@property” defined on “@typedef {Number|BigInt}”)
 		let {names} = obj.type;
-		if(names.every(name => isPrimitive.test(name)))
-			throw new TypeError(`Primitive "${RegExp.lastMatch}" cannot have properties`);
+		if(names.every(name => isPrimitive.test(name))){
+			names = names.map(name => `"${name}"`).join(", ");
+			throw new TypeError(`Primitive types ${names} cannot have properties`);
+		}
 		
 		// Single-type, not a POJO
 		if(1 === names.length && !isObject.test(names[0])){

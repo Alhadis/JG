@@ -61,7 +61,9 @@ if(!argv.length){
 				+ (extend.length ? ` ${extend.join(" ")}` : "")
 				+ ({class: 1, enum: 1, interface: 1}[type]
 					? ` { ${body.replace(/^\s*{\s*|\s*}\s*$/g, "")} }`
-					: `:${body.replace(/[;\s]+$/, "")};`));
+					: "type" === type
+						? ` = ${body.replace(/[;\s]+$/, "")};`
+						: `:${body.replace(/[;\s]+$/, "")};`));
 		}
 		types = Array.from(types.values());
 		options.sort && types.sort();

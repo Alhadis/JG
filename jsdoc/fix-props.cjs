@@ -4,6 +4,12 @@ const matchProp = /((?:^|\n)(?:\/\*\*)?\s*\*\s*)@prop(?:erty)?(?:\s+({.+?}))(?:\
 const matchOwner = /^\s*\*\s*@(class|typedef|const(?:ant)?|namespace|member(?:of)?)(?:\s+([^\n]+))\s*$/;
 
 module.exports.handlers = {
+	beforeParse(){
+		if("function" === typeof BigInt)
+			BigInt.prototype.toJSON ??= function(){
+				return this.toString();
+			};
+	},
 	jsdocCommentFound(event){
 		event.comment = event.comment
 			.replace(/\/\*\*((?:[^*]|\*[^/])+)\*\//g, (input, body) => {
